@@ -1,0 +1,97 @@
+version: '3'
+services:
+  bootnode:
+    image: dlt-node
+    container_name: bootnode
+    hostname: bootnode
+    volumes:
+      - ./.env:/dlt-network/bootnode.env
+      - ./../../docker-images/dlt-node/scripts/password.txt:/dlt-network/password.txt
+      - ./../../docker-images/dlt-node/scripts/bootnode_start.sh:/dlt-network/bootnode_start.sh
+    command: ./bootnode_start.sh
+    networks:
+      dlt_network:
+        ipv4_address: ${BOOTNODE_IP}
+  
+  node1:
+    image: dlt-node
+    container_name: node1
+    hostname: node1
+    depends_on:
+      - bootnode
+    volumes:
+      - ./.env:/dlt-network/node1.env
+      - ./../../docker-images/dlt-node/scripts/genesis_4_validators.json:/dlt-network/genesis.json
+      - ./../../docker-images/dlt-node/scripts/password.txt:/dlt-network/password.txt
+      - ./../../docker-images/dlt-node/scripts/node1_start.sh:/dlt-network/node1_start.sh      
+    command: ./node1_start.sh
+    networks:
+      dlt_network:
+        ipv4_address: ${IP_NODE_1}
+  
+  node2:
+    image: dlt-node
+    container_name: node2
+    hostname: node2
+    depends_on:
+      - bootnode
+    volumes:
+      - ./.env:/dlt-network/node2.env
+      - ./../../docker-images/dlt-node/scripts/genesis_4_validators.json:/dlt-network/genesis.json
+      - ./../../docker-images/dlt-node/scripts/password.txt:/dlt-network/password.txt
+      - ./../../docker-images/dlt-node/scripts/node2_start.sh:/dlt-network/node2_start.sh      
+    command: ./node2_start.sh
+    networks:
+      dlt_network:
+        ipv4_address: ${IP_NODE_2}
+  
+  node3:
+    image: dlt-node
+    container_name: node3
+    hostname: node3
+    depends_on:
+      - bootnode
+    volumes:
+      - ./.env:/dlt-network/node3.env
+      - ./../../docker-images/dlt-node/scripts/genesis_4_validators.json:/dlt-network/genesis.json
+      - ./../../docker-images/dlt-node/scripts/password.txt:/dlt-network/password.txt
+      - ./../../docker-images/dlt-node/scripts/node3_start.sh:/dlt-network/node3_start.sh      
+    command: ./node3_start.sh
+    networks:
+      dlt_network:
+        ipv4_address: ${IP_NODE_3}
+  
+  node4:
+    image: dlt-node
+    container_name: node4
+    hostname: node4
+    depends_on:
+      - bootnode
+    volumes:
+      - ./.env:/dlt-network/node4.env
+      - ./../../docker-images/dlt-node/scripts/genesis_4_validators.json:/dlt-network/genesis.json
+      - ./../../docker-images/dlt-node/scripts/password.txt:/dlt-network/password.txt
+      - ./../../docker-images/dlt-node/scripts/node4_start.sh:/dlt-network/node4_start.sh      
+    command: ./node4_start.sh
+    networks:
+      dlt_network:
+        ipv4_address: ${IP_NODE_4}
+  
+  eth-netstats:
+    image: eth-netstats
+    container_name: eth-netstats
+    depends_on:
+      - node1
+    ports:
+      - "3000:3000"
+    networks:
+      dlt_network:
+        ipv4_address: ${ETH_NETSATS_IP}
+
+networks:
+  dlt_network:
+    name: dlt_network
+    ipam:
+      driver: default
+      config: 
+        - subnet: ${DLT_SUBNET}
