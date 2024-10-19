@@ -9,7 +9,7 @@ if [ -z "$CONTRACT_ADDRESS" ]; then
   exit 1
 fi
 
-eth_node_url="ws://172.18.0.5:3334"
+eth_node_url="ws://10.5.30.10:3334"
 
 echo "ETH_NODE_URL: $eth_node_url"
 echo "CONTRACT_ADDRESS: $CONTRACT_ADDRESS"
@@ -23,5 +23,6 @@ docker run \
     --net host \
     -e ETH_NODE_URL="$eth_node_url" \
     -e CONTRACT_ADDRESS="$CONTRACT_ADDRESS" \
+    -v "$(pwd)/data":/app/data \
     -v "$(pwd)/../../smart-contracts":/app/smart-contracts \
     dlt-txs-monitoring:latest

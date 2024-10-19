@@ -19877,10 +19877,16 @@
       "links": {},
       "address": "0x8a899B9fF6293789A9Ed8716e08e5fCA83e975af",
       "transactionHash": "0xe2824c8a102ea88ac24bfced398ef76f10a0acb8c8221a1f4614aab6af0287fc"
+    },
+    "2024": {
+      "events": {},
+      "links": {},
+      "address": "0xBEd601937431925036638a3464E5Dd3A31AE65e1",
+      "transactionHash": "0x2c193246efb03e05f862cb241ce9fa106c63eefb7e0027cd59e3e1bbf8dd30e5"
     }
   },
   "schemaVersion": "3.4.16",
-  "updatedAt": "2024-10-17T17:04:04.087Z",
+  "updatedAt": "2024-10-19T18:16:59.135Z",
   "networkType": "ethereum",
   "devdoc": {
     "methods": {}

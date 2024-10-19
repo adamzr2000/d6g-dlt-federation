@@ -50,3 +50,16 @@ services:
     command: ./node_start.sh
     network_mode: "host"
     restart: always
+
+  # dlt-txs-monitoring:
+  #   image: dlt-txs-monitoring
+  #   container_name: dlt-txs-monitoring
+  #   depends_on:
+  #     - node1
+  #   volumes:
+  #     - ./data:/app/data
+  #     - ./../smart-contracts":/app/smart-contracts
+  #   environment:
+  #      ETH_NODE_URL: "ws://10.5.30.10:3334"
+  #      CONTRACT_ADDRESS: "0x8a899B9fF6293789A9Ed8716e08e5fCA83e975af"
+  #   restart: always
