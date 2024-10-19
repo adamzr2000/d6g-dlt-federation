@@ -30,10 +30,13 @@ services:
     image: dlt-node
     container_name: bootnode
     hostname: bootnode
+    depends_on:
+      - influxdb
     volumes:
       - ./../config/dlt/bootnode.env:/dlt-network/.env
     command: ./bootnode_start.sh
     network_mode: "host"
+    restart: always
 
   node1:
     image: dlt-node
@@ -46,3 +49,4 @@ services:
       - ./../docker-images/dlt-node/scripts/genesis_2_validators.json:/dlt-network/genesis.json
     command: ./node_start.sh
     network_mode: "host"
+    restart: always
