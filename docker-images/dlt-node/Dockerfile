@@ -92,12 +92,14 @@ COPY node50 ./node50
 RUN mkdir logs
 
 # # Copy the shell scripts and other files
-# COPY scripts/*_start.sh ./
-# COPY scripts/password.txt ./ 
+COPY scripts/bootnode_start.sh ./bootnode_start.sh
+COPY scripts/node_start.sh ./node_start.sh
 # COPY scripts/genesis.json ./
 
-# # Make bash scripts executable
-# RUN chmod +x scripts/*_start.sh
+COPY scripts/password.txt ./password.txt
+
+# Make bash scripts executable
+RUN chmod +x ./*_start.sh
 
 # Keep container running
 #CMD tail -f /dev/null

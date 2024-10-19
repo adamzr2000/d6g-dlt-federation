@@ -65,8 +65,8 @@ domain = os.getenv('DOMAIN_FUNCTION').strip().lower()
 dlt_node_id = os.getenv('DLT_NODE_ID')
 interface_name = os.getenv('INTERFACE_NAME')
 sudo_password = os.getenv('SUDO_PASSWORD') 
-eth_node_url = os.getenv(f'WS_NODE_{dlt_node_id}_URL')
-ip_address = os.getenv(f'IP_NODE_{dlt_node_id}')
+eth_node_url = os.getenv('WS_URL')
+ip_address = os.getenv('NODE_IP')
 
 # Web3 and Federation SC setup
 try:

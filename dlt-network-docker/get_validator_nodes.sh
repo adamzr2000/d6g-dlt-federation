@@ -15,15 +15,8 @@ source "./../config/dlt/${NODE}.env" 2>/dev/null
 # Extract the ID from the node name
 NODE_ID=${NODE: -1}
 
-# Extract the environment variables for the node
-IP_VAR="IP_NODE_${NODE_ID}"
-WS_PORT_VAR="WS_PORT_NODE_${NODE_ID}"
-
-IP=$(eval echo \$$IP_VAR)
-WS_PORT=$(eval echo \$$WS_PORT_VAR)
-
 # Construct the Geth command to get the number of peers
-GETH_CMD="geth --exec 'clique.getSigners()' attach ws://${IP}:${WS_PORT}"
+GETH_CMD="geth --exec 'clique.getSigners()' $WS_URL"
 
 # Construct the Docker command to get the number of peers
 DOCKER_CMD="docker exec -it ${NODE} sh -c \"$GETH_CMD\""

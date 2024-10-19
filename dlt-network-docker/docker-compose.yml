@@ -1,13 +1,37 @@
 version: '3'
 services:
+  influxdb:
+    image: influxdb:1.8
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      INFLUXDB_HTTP_FLUX_ENABLED: "false"
+      INFLUXDB_HTTP_AUTH_ENABLED: "false"
+      INFLUXDB_DB: "geth"
+    restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    volumes:
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+    environment:
+       GF_SECURITY_ADMIN_USER: "desire6g"
+       GF_SECURITY_ADMIN_PASSWORD: "desire6g2024;"
+    depends_on:
+      - influxdb
+    ports:
+      - "3000:3000"
+    restart: always
+
   bootnode:
     image: dlt-node
     container_name: bootnode
     hostname: bootnode
     volumes:
-      - ./../config/dlt/bootnode.env:/dlt-network/bootnode.env
-      - ./../docker-images/dlt-node/scripts/password.txt:/dlt-network/password.txt
-      - ./../docker-images/dlt-node/scripts/bootnode_start.sh:/dlt-network/bootnode_start.sh
+      - ./../config/dlt/bootnode.env:/dlt-network/.env
     command: ./bootnode_start.sh
     network_mode: "host"
 
@@ -18,16 +42,7 @@ services:
     depends_on:
       - bootnode
     volumes:
-      - ./../config/dlt/node1.env:/dlt-network/node1.env
+      - ./../config/dlt/node1.env:/dlt-network/.env
       - ./../docker-images/dlt-node/scripts/genesis_2_validators.json:/dlt-network/genesis.json
-      - ./../docker-images/dlt-node/scripts/password.txt:/dlt-network/password.txt
-      - ./../docker-images/dlt-node/scripts/node1_start.sh:/dlt-network/node1_start.sh      
-    command: ./node1_start.sh
-    network_mode: "host"
-
-  eth-netstats:
-    image: eth-netstats
-    container_name: eth-netstats
-    depends_on:
-      - node1
+    command: ./node_start.sh
     network_mode: "host"

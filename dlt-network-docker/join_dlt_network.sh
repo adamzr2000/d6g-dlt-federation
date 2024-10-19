@@ -34,13 +34,11 @@ fi
 GENESIS_FILE="genesis_${VALIDATORS}_validators.json"
 
 # Proceed with the operation
-START_CMD="./${NODE_SELECTION}_start.sh"
+START_CMD="./node_start.sh"
 
 DOCKER_CMD="docker run -d --name $NODE_SELECTION --hostname $NODE_SELECTION --network host --rm \
--v $(pwd)/../config/dlt/$NODE_SELECTION.env:/dlt-network/$NODE_SELECTION.env \
--v $(pwd)/../docker-images/dlt-node/scripts/$GENESIS_FILE:/dlt-network/genesis.json \
--v $(pwd)/../docker-images/dlt-node/scripts/password.txt:/dlt-network/password.txt \
--v $(pwd)/../docker-images/dlt-node/scripts/${NODE_SELECTION}_start.sh:/dlt-network/${NODE_SELECTION}_start.sh \
+-v $(pwd)/../config/dlt/$NODE_SELECTION.env:/dlt-network/.env \
+-v $(pwd)/../config/dlt/genesis/$GENESIS_FILE:/dlt-network/genesis.json \
 dlt-node $START_CMD"
 
 echo "Starting $NODE_SELECTION with $GENESIS_FILE and command $START_CMD..."

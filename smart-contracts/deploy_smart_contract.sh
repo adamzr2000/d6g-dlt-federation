@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Run truffle migrate command and capture the output
-output=$(truffle migrate --network node1)
+output=$(truffle migrate --network dlt_network)
 
 # Print the output
 echo "$output"

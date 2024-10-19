@@ -1,39 +1,23 @@
 #!/bin/bash
 
-# Function to load specific environment variables from a file
-load_specific_env_vars() {
-  local env_file="$1"
-  local node_index="$2"
-  
-  if [ -f "$env_file" ]; then
-    echo "Loading specific environment variables from $env_file"
-    eval $(grep "^IP_NODE_${node_index}=" "$env_file" | xargs)
-    eval $(grep "^WS_PORT_NODE_${node_index}=" "$env_file" | xargs)
+# Path to the node1 environment file
+NODE_ENV_FILE="../config/dlt/node1.env"
+
+# Function to load environment variables from node1.env
+load_env_vars() {
+  if [ -f "$NODE_ENV_FILE" ]; then
+    echo "Loading environment variables from $NODE_ENV_FILE"
+    source "$NODE_ENV_FILE"  # Load the environment file to access variables directly
   else
-    echo "Environment file $env_file not found!"
+    echo "Environment file $NODE_ENV_FILE not found!"
     exit 1
   fi
 }
 
-# Array of node environment files
-node_env_files=(
-  "../config/dlt/node1.env"
-  "../config/dlt/node2.env"
-  "../config/dlt/node3.env"
-  "../config/dlt/node4.env"
-)
+# Load the environment variables
+load_env_vars
 
-# Load specific environment variables for each node and construct docker_env_args
-docker_env_args=""
-for env_file in "${node_env_files[@]}"; do
-  # Extract the node index (e.g., 1 from node1.env)
-  node_index=$(basename "$env_file" | grep -o '[0-9]\+')
-  load_specific_env_vars "$env_file" "$node_index"
-  docker_env_args+=" -e IP_NODE_${node_index}=$(eval echo \$IP_NODE_${node_index})"
-  docker_env_args+=" -e WS_PORT_NODE_${node_index}=$(eval echo \$WS_PORT_NODE_${node_index})"
-done
-
-# Construct the start command based on the selection
+# Construct the start command for deploying the smart contract
 START_CMD="./deploy_smart_contract.sh"
 
 # Start a Docker container with the specified configurations
@@ -43,7 +27,8 @@ docker run \
   --name truffle \
   --hostname truffle \
   --network host \
-  -v $(pwd)/.:/smart-contracts \
-  $docker_env_args \
+  -v "$(pwd)/.":/smart-contracts \
+  -e NODE_IP="$NODE_IP" \
+  -e WS_PORT="$WS_PORT" \
   truffle:latest \
   $START_CMD

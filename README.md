@@ -44,8 +44,6 @@ Navigate to the [docker-images](./docker-images) directory and run the `./build.
 
 - `truffle`: Development framework for Ethereum-based blockchain applications. It provides a suite of tools that allows developers to write, test, and deploy smart contracts. (detailed info [here](./docker-images/truffle/)). ![#00FF00](https://via.placeholder.com/15/00ff00/000000?text=+) Available
 
-- `eth-netstats`: Dashboard for monitoring Geth nodes. (detailed info [here](./docker-images/eth-netstats/)). ![#00FF00](https://via.placeholder.com/15/00ff00/000000?text=+) Available
-
 3. Install Python dependencies:
 ```bash
 pip3 install -r requirements.txt
@@ -93,7 +91,7 @@ Use the following commands to confirm both nodes are connected:
 ```
 Each command should show `1 peer`.
 
-Access the `eth-netsats` web interface for additional information at [http://localhost:3000](http://localhost:3000)
+Access the `grafana` dashboard for additional information at [http://localhost:3000](http://localhost:3000)
 
 4. Add more nodes:
 
