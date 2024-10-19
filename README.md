@@ -93,6 +93,8 @@ Each command should show `1 peer`.
 
 Access the `grafana` dashboard for additional information at [http://localhost:3000](http://localhost:3000)
 
+> Note: The username is `desire6g` and the password `desire6g2024;`.
+
 4. Add more nodes:
 
 Use the [join_dlt_network.sh](./dlt-network-docker/join_dlt_network.sh) script to add more nodes. 
