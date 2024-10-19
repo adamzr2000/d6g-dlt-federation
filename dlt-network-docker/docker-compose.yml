@@ -46,7 +46,7 @@ services:
       - bootnode
     volumes:
       - ./../config/dlt/node1.env:/dlt-network/.env
-      - ./../docker-images/dlt-node/scripts/genesis_2_validators.json:/dlt-network/genesis.json
+      - ./../config/dlt/genesis/genesis_2_validators.json:/dlt-network/genesis.json
     command: ./node_start.sh
     network_mode: "host"
     restart: always
