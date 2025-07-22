@@ -2,49 +2,62 @@
 
 # Initialize variables
 node_ip=""
-ws_port=""
+port=""
+protocol="ws"      # default
+network_id="2024"  # default
 
-# Parse command-line arguments
+# Parse arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --node-ip)
       node_ip="$2"
       shift 2
       ;;
-    --ws-port)
-      ws_port="$2"
+    --port)
+      port="$2"
+      shift 2
+      ;;
+    --protocol)
+      protocol="$2"
+      shift 2
+      ;;
+    --network-id)
+      network_id="$2"
       shift 2
       ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: $0 --node-ip <IP> --ws-port <port>"
+      echo "Usage: $0 --node-ip <IP> --port <PORT> [--protocol ws|http] [--network-id <ID>]"
       exit 1
       ;;
   esac
 done
 
-# Ensure required arguments are provided
-if [[ -z "$node_ip" || -z "$ws_port" ]]; then
-  echo "Error: Both --node-ip and --ws-port must be provided."
-  echo "Usage: $0 --node-ip <IP> --ws-port <port>"
+# Check required args
+if [[ -z "$node_ip" || -z "$port" ]]; then
+  echo "Error: --node-ip and --port are required."
+  echo "Usage: $0 --node-ip <IP> --port <PORT> [--protocol ws|http] [--network-id <ID>]"
   exit 1
 fi
 
-echo "Starting Truffle container with:"
-echo " - Node IP: $node_ip"
-echo " - WebSocket Port: $ws_port"
+echo "🚀 Starting Truffle container with:"
+echo " - Node IP    : $node_ip"
+echo " - Port       : $port"
+echo " - Protocol   : $protocol"
+echo " - Network ID : $network_id"
 
-# Construct the start command for deploying the smart contract
-START_CMD="./deploy.sh"
+# Construct the command for the container
+START_CMD="./deploy.sh --node-ip $node_ip --port $port --protocol $protocol"
 
-# Start a Docker container with the specified configurations
 docker run \
   -it \
   --rm \
   --name truffle \
-  --hostname truffle \
+  --network host \
   -v "$(pwd)/smart-contracts":/smart-contracts \
   -e NODE_IP="$node_ip" \
-  -e WS_PORT="$ws_port" \
+  -e PORT="$port" \
+  -e PROTOCOL="$protocol" \
+  -e NETWORK_ID="$network_id" \
   truffle:latest \
-  $START_CMD
+  bash -c "cd /smart-contracts && $START_CMD"

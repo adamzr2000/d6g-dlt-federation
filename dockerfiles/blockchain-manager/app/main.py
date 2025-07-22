@@ -12,26 +12,19 @@ from pydantic import BaseModel
 from typing import Optional, List
 from enum import Enum
 
-import utility_functions as utils
+import utils
+from blockchain_interface import BlockchainInterface
 
 # Define FastAPI app and OpenAPI metadata
 tags_metadata = [
-    {"name": "Default DLT federation functions", "description": "Functions for consumer and provider domains."},
-    {"name": "Consumer DLT federation functions", "description": "Functions for consumer domains."},
-    {"name": "Provider DLT federation functions", "description": "Functions for provider domains."}
+    {"name": "General federation functions", "description": "General functions."},
+    {"name": "Consumer functions", "description": "Functions for consumer domains."},
+    {"name": "Provider functions", "description": "Functions for provider domains."}
 ]
 
-class FederationEvents(str, Enum):
-    OPERATOR_REGISTERED = "OperatorRegistered"
-    OPERATOR_REMOVED = "OperatorRemoved"
-    SERVICE_ANNOUNCEMENT = "ServiceAnnouncement"
-    NEW_BID = "NewBid"
-    SERVICE_ANNOUNCEMENT_CLOSED = "ServiceAnnouncementClosed"
-    SERVICE_DEPLOYED_EVENT = "ServiceDeployedEvent"
-
 app = FastAPI(
-    title="DLT Service Federation API",
-    description="This API provides endpoints for interacting with the DLT (Blockchain + Federation Smart Contract)",
+    title="DLT Federation - Blockchain Manager API",
+    description="This API provides endpoints for interacting with the Federation Smart Contract",
     version="1.0.0",
     openapi_tags=tags_metadata
 )
@@ -41,52 +34,25 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=lo
 logger = logging.getLogger(__name__)
 
 # Load environment variables
-env_files = ['FEDERATION_ENV_FILE', 'DLT_NODE_ENV_FILE', 'SMART_CONTRACT_ENV_FILE']
-for env_file in env_files:
-    file = os.getenv(env_file)
-    if file:
-        load_dotenv(file, override=True)
-        logger.info(f"Loaded environment variables from: {file}")
-    else:
-        raise EnvironmentError(f"Environment variable {env_file} is not set.")
-
-# Configuration from environment variables
 try:
     domain = os.getenv('DOMAIN_FUNCTION', '').strip().lower()
-    dlt_node_id = os.getenv('DLT_NODE_ID')
-    eth_node_url = os.getenv('WS_URL')
-    ip_address = os.getenv('NODE_IP')
-
+    eth_address = os.getenv('ETH_ADDRESS')
+    eth_private_key = os.getenv('ETH_PRIVATE_KEY')
+    eth_node_url = os.getenv('ETH_NODE_URL')
+    contract_address = Web3.toChecksumAddress(os.getenv('CONTRACT_ADDRESS'))
 
 except Exception as e:
     logger.error(f"Error loading configuration: {e}")
     raise
 
-# Web3 and Federation SC setup
-try:
-    web3 = Web3(WebsocketProvider(eth_node_url))
-    web3.middleware_onion.inject(geth_poa_middleware, layer=0)
-
-    if web3.isConnected():
-        geth_version = web3.clientVersion
-        logger.info(f"Successfully connected to Ethereum node {eth_node_url} - Version: {geth_version}")
-    else:
-        raise ConnectionError(f"Failed to connect to Ethereum node {eth_node_url}")
-    
-    contract_abi = json.load(open("smart-contracts/build/contracts/Federation.json"))["abi"]
-    contract_address = web3.toChecksumAddress(os.getenv('CONTRACT_ADDRESS'))
-    Federation_contract = web3.eth.contract(abi=contract_abi, address=contract_address)
-    private_key = os.getenv('PRIVATE_KEY')
-    block_address = os.getenv('ETHERBASE')
-    # Number used to ensure the order of transactions (and prevent transaction replay attacks)
-    nonce = web3.eth.getTransactionCount(block_address)
-
-except Exception as e:
-    logger.error(f"Error initializing Web3: {e}")
-
-# Initialize global variables
-service_id = ''
-domain_registered = False
+# Initialize blockchain interface
+blockchain = BlockchainInterface(
+    eth_address=eth_address,
+    private_key=eth_private_key,
+    eth_node_url=eth_node_url,
+    abi_path="/smart-contracts/build/contracts/Federation.json",
+    contract_address=contract_address
+)
 
 # Pydantic Models
 class TransactionReceiptResponse(BaseModel):
@@ -181,255 +147,9 @@ def format_service_requirements(request: ServiceAnnouncementRequest) -> str:
     # Join all fields with a semicolon separator
     return "; ".join(fields)
 
-# DLT federation functions
-def send_signed_transaction(build_transaction):
-    """
-    Sends a signed transaction to the blockchain network using the private key.
-    
-    Args:
-        build_transaction (dict): The transaction data to be sent.
-    
-    Returns:
-        str: The transaction hash of the sent transaction.
-    """
-    global nonce
-    # Sign the transaction
-    signed_txn = web3.eth.account.signTransaction(build_transaction, private_key)
-    # Send the signed transaction
-    tx_hash = web3.eth.sendRawTransaction(signed_txn.rawTransaction)
-    # Increment the nonce
-    nonce += 1
-    return tx_hash.hex()
-        
-def create_event_filter(event_name: FederationEvents, last_n_blocks: Optional[int] = None):
-    """
-    Creates a filter to catch the specified event emitted by the smart contract.
-    This function can be used to monitor events in real-time or from a certain number of past blocks.
 
-    Args:
-    - event_name (FederationEvents): The name of the smart contract event to create a filter for.
-    - last_n_blocks (int, optional): If provided, specifies the number of blocks to look back from the latest block.
-                                       If not provided, it listens from the latest block onward.
-
-    Returns:
-    - Filter: A filter for catching the specified event.
-    """
-    global Federation_contract
-    try:
-        block = web3.eth.getBlock('latest')
-        block_number = block['number']
-        
-        # If last_n_blocks is provided, look back, otherwise start from the latest block
-        from_block = max(0, block_number - last_n_blocks) if last_n_blocks else block_number
-        
-        event_filter = getattr(Federation_contract.events, event_name.value).createFilter(fromBlock=web3.toHex(from_block))
-        return event_filter
-    except AttributeError:
-        raise ValueError(f"Event '{event_name}' does not exist in the contract.")
-    except Exception as e:
-        raise Exception(f"An error occurred while creating the filter for event '{event_name}': {str(e)}")
-
-def RegisterDomain(domain_name: str, blockchain_address: str) -> str:
-    global nonce, Federation_contract
-    try:
-        add_operator_transaction = Federation_contract.functions.addOperator(
-            web3.toBytes(text=domain_name)
-        ).buildTransaction({
-            'from': blockchain_address,
-            'nonce': nonce,
-        })
-        tx_hash = send_signed_transaction(add_operator_transaction)
-        return tx_hash
-    except Exception as e:
-        logger.error(f"Failed to register domain: {str(e)}")
-        raise Exception("Domain registration failed.")
-
-
-def UnregisterDomain(blockchain_address: str) -> str:
-    global nonce, Federation_contract
-    try:
-        del_operator_transaction = Federation_contract.functions.removeOperator().buildTransaction({
-            'from': blockchain_address,
-            'nonce': nonce,
-        })
-        tx_hash = send_signed_transaction(del_operator_transaction)
-        return tx_hash
-    except Exception as e:
-        logger.error(f"Failed to unregister domain: {str(e)}")
-        raise Exception("Domain unregistration failed.")
-                                 
-def AnnounceService(blockchain_address: str, service_requirements: str,
-                    endpoint_service_catalog_db: str, endpoint_topology_db:str,
-                    endpoint_nsd_id: str, endpoint_ns_id:str) -> str:
-    global service_id, nonce, Federation_contract
-    try:
-        service_id = 'service' + str(int(time.time()))
-        announce_transaction = Federation_contract.functions.AnnounceService(
-            _requirements=web3.toBytes(text=service_requirements),
-            _id=web3.toBytes(text=service_id),
-            endpoint_service_catalog_db=web3.toBytes(text=endpoint_service_catalog_db),
-            endpoint_topology_db=web3.toBytes(text=endpoint_topology_db),
-            endpoint_nsd_id=web3.toBytes(text=endpoint_nsd_id),
-            endpoint_ns_id=web3.toBytes(text=endpoint_ns_id)
-        ).buildTransaction({
-            'from': blockchain_address,
-            'nonce': nonce
-        })
-        tx_hash = send_signed_transaction(announce_transaction)
-        return tx_hash
-    except Exception as e:
-        logger.error(f"Failed to announce service: {str(e)}")
-        raise Exception("Service announcement failed.")
-
-def UpdateEndpoint(service_id: str, domain: str, blockchain_address: str, 
-                   endpoint_service_catalog_db: str, endpoint_topology_db:str,
-                   endpoint_nsd_id: str, endpoint_ns_id:str) -> str:
-    global nonce, Federation_contract
-    try:
-        provider_flag = (domain == "provider")
-        update_endpoint_transaction = Federation_contract.functions.UpdateEndpoint(
-            provider=provider_flag, 
-            _id=web3.toBytes(text=service_id),
-            endpoint_service_catalog_db=web3.toBytes(text=endpoint_service_catalog_db),
-            endpoint_topology_db=web3.toBytes(text=endpoint_topology_db),
-            endpoint_nsd_id=web3.toBytes(text=endpoint_nsd_id),
-            endpoint_ns_id=web3.toBytes(text=endpoint_ns_id)
-        ).buildTransaction({
-            'from': blockchain_address,
-            'nonce': nonce
-        })
-        tx_hash = send_signed_transaction(update_endpoint_transaction)
-        return tx_hash
-    except Exception as e:
-        logger.error(f"Failed to update endpoint: {str(e)}")
-        raise Exception("Service update failed.")
-
-def GetBidInfo(service_id: str, bid_index: int, blockchain_address: str) -> tuple:
-    global Federation_contract
-    try:
-        bid_info = Federation_contract.functions.GetBid(
-            _id=web3.toBytes(text=service_id),
-            bider_index=bid_index,
-            _creator=blockchain_address
-        ).call()
-        return bid_info
-    except Exception as e:
-        logger.error(f"Failed to retrieve bid info for service_id {service_id} and bid_index {bid_index}: {str(e)}")
-        raise Exception("Error occurred while retrieving bid information.")
-
-def ChooseProvider(service_id: str, bid_index: int, blockchain_address) -> str:
-    global nonce, Federation_contract
-    try:
-        choose_transaction = Federation_contract.functions.ChooseProvider(
-            _id=web3.toBytes(text=service_id),
-            bider_index=bid_index
-        ).buildTransaction({
-            'from': blockchain_address,
-            'nonce': nonce
-        })
-        tx_hash = send_signed_transaction(choose_transaction)
-        return tx_hash
-    except Exception as e:
-        logger.error(f"Failed to choose provider for service_id {service_id} and bid_index {bid_index}: {str(e)}")
-        raise Exception("Error occurred while choosing the provider.")
-
-def GetServiceState(service_id: str) -> int:  
-    global Federation_contract
-    try:
-        service_state = Federation_contract.functions.GetServiceState(_id=web3.toBytes(text=service_id)).call()
-        return service_state
-    except Exception as e:
-        logger.error(f"Failed to retrieve service state for service_id {service_id}: {str(e)}")
-        raise Exception(f"Error occurred while retrieving the service state for service_id {service_id}.")
-
-def GetServiceInfo(service_id: str, domain: str, blockchain_address: str) -> tuple:
-    global Federation_contract
-    try:
-        service_id_bytes = web3.toBytes(text=service_id)
-        provider_flag = (domain == "provider")
-        
-        service_id, federated_host, endpoint_service_catalog_db, endpoint_topology_db, endpoint_nsd_id, endpoint_ns_id = Federation_contract.functions.GetServiceInfo(
-            _id=service_id_bytes, provider=provider_flag, call_address=blockchain_address).call()
-
-        return (
-            federated_host.rstrip(b'\x00').decode('utf-8'),
-            endpoint_service_catalog_db.rstrip(b'\x00').decode('utf-8'),
-            endpoint_topology_db.rstrip(b'\x00').decode('utf-8'),
-            endpoint_nsd_id.rstrip(b'\x00').decode('utf-8'),
-            endpoint_ns_id.rstrip(b'\x00').decode('utf-8')
-        )
-    except Exception as e:
-        logger.error(f"Failed to retrieve deployed info for service_id {service_id} and domain {domain}: {str(e)}")
-        raise Exception(f"Error occurred while retrieving deployed info for service_id {service_id} and domain {domain}.")
-
-def PlaceBid(service_id: str, service_price: int, blockchain_address: str,
-            endpoint_service_catalog_db: str, endpoint_topology_db:str,
-            endpoint_nsd_id: str, endpoint_ns_id:str) -> str:
-    global nonce, Federation_contract
-    try:
-        place_bid_transaction = Federation_contract.functions.PlaceBid(
-            _id=web3.toBytes(text=service_id),
-            _price=service_price,
-            endpoint_service_catalog_db=web3.toBytes(text=endpoint_service_catalog_db),
-            endpoint_topology_db=web3.toBytes(text=endpoint_topology_db),
-            endpoint_nsd_id=web3.toBytes(text=endpoint_nsd_id),
-            endpoint_ns_id=web3.toBytes(text=endpoint_ns_id)
-        ).buildTransaction({
-            'from': blockchain_address,
-            'nonce': nonce
-        })
-        tx_hash = send_signed_transaction(place_bid_transaction)
-        return tx_hash
-
-    except Exception as e:
-        logger.error(f"Failed to place bid for service_id {service_id}: {str(e)}")
-        raise Exception(f"Error occurred while placing bid for service_id {service_id}.")
-
-def CheckWinner(service_id: str, blockchain_address: str) -> bool:
-    global Federation_contract
-    try:
-        state = GetServiceState(service_id)
-        if state == 1:
-            result = Federation_contract.functions.isWinner(
-                _id=web3.toBytes(text=service_id), 
-                _winner=blockchain_address
-            ).call()
-            return result
-        else:
-            return False
-    except Exception as e:
-        logger.error(f"Failed to check winner for service_id {service_id}: {str(e)}")
-        raise Exception(f"Error occurred while checking the winner for service_id {service_id}.")
-
-def ServiceDeployed(service_id: str, federated_host: str, blockchain_address: str) -> str:
-    global nonce, Federation_contract
-    try:
-        service_deployed_transaction = Federation_contract.functions.ServiceDeployed(
-            info=web3.toBytes(text=federated_host),
-            _id=web3.toBytes(text=service_id)
-        ).buildTransaction({
-            'from': blockchain_address,
-            'nonce': nonce
-        })
-        tx_hash = send_signed_transaction(service_deployed_transaction)
-        return tx_hash
-    except Exception as e:
-        logger.error(f"Failed to confirm deployment for service_id {service_id}: {str(e)}")
-        raise Exception(f"Failed to confirm deployment for service_id {service_id}.")
-
-def DisplayServiceState(service_id: str):  
-    current_service_state = GetServiceState(service_id)
-    if current_service_state == 0:
-        logger.info("Service state: Open")
-    elif current_service_state == 1:
-        logger.info("Service state: Closed")
-    elif current_service_state == 2:
-        logger.info("Service state: Deployed")
-    else:
-        logger.error(f"Error: state for service {service_id} is {current_service_state}")
-
-# DLT-related API Endpoints
-@app.get("/web3_info", summary="Get Web3 info", tags=["Default DLT federation functions"])
+# API Endpoints
+@app.get("/web3_info", summary="Get Web3 info", tags=["General federation functions"])
 async def web3_info_endpoint():
     """
     Retrieve Web3 connection details.
@@ -444,18 +164,18 @@ async def web3_info_endpoint():
         HTTPException:
             - 500: If there is an issue retrieving the Ethereum node or Web3 connection information.
     """
-    global eth_node_url, block_address, contract_address
+    global eth_node_url, eth_address, contract_address
     try:
         web3_info = {
             "ethereum_node_url": eth_node_url,
-            "ethereum_address": block_address,
+            "ethereum_address": eth_address,
             "contract_address": contract_address
         }
         return JSONResponse(content={"web3_info": web3_info})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/tx_receipt", summary="Get transaction receipt", tags=["Default DLT federation functions"], response_model=TransactionReceiptResponse)
+@app.get("/tx_receipt", summary="Get transaction receipt", tags=["General federation functions"], response_model=TransactionReceiptResponse)
 async def tx_receipt_endpoint(tx_hash: str = Query(..., description="The transaction hash to retrieve the receipt")):
     """
     Retrieves the transaction receipt details for a specified transaction hash.
@@ -483,28 +203,12 @@ async def tx_receipt_endpoint(tx_hash: str = Query(..., description="The transac
     """
     try:
         # Get the transaction receipt
-        receipt = web3.eth.get_transaction_receipt(tx_hash)
-        if receipt:
-            # Convert HexBytes to strings for JSON serialization
-            receipt_dict = dict(receipt)
-            receipt_dict['blockHash'] = receipt_dict['blockHash'].hex()
-            receipt_dict['transactionHash'] = receipt_dict['transactionHash'].hex()
-            receipt_dict['logsBloom'] = receipt_dict['logsBloom'].hex()
-            receipt_dict['logs'] = [dict(log) for log in receipt_dict['logs']]
-
-            # Rename fields to match the expected response model
-            receipt_dict['from_address'] = receipt_dict.pop('from')
-            receipt_dict['to_address'] = receipt_dict.pop('to')
-
-            for log in receipt_dict['logs']:
-                log['blockHash'] = log['blockHash'].hex()
-                log['transactionHash'] = log['transactionHash'].hex()
-                log['topics'] = [topic.hex() for topic in log['topics']]
-            return JSONResponse(content={"tx_receipt": receipt_dict})
+        receipt_dict = blockchain.get_transaction_receipt(tx_hash)
+        return JSONResponse(content={"tx_receipt": receipt_dict})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.post("/register_domain", summary="Register a new domain (operator)", tags=["Default DLT federation functions"])
+@app.post("/register_domain", summary="Register a new domain (operator)", tags=["General federation functions"])
 def register_domain_endpoint(request: DomainRegistrationRequest):
     """
     Registers a new domain (operator) in the federation.
@@ -521,18 +225,13 @@ def register_domain_endpoint(request: DomainRegistrationRequest):
         HTTPException:
             - 500: If the domain is already registered or if there is an error during the registration process.
     """
-    global domain_registered, block_address
     try:
-        if not domain_registered:
-            tx_hash = RegisterDomain(request.name, block_address)
-            domain_registered = True
-            return JSONResponse(content={"tx_hash": tx_hash})
-        else:
-            raise HTTPException(status_code=500, detail=f"Domain {request.name} is already registered.")
+        tx_hash = blockchain.register_domain(request.name)
+        return JSONResponse(content={"tx_hash": tx_hash})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/unregister_domain", summary="Unregisters an existing domain (operator)", tags=["Default DLT federation functions"])
+@app.delete("/unregister_domain", summary="Unregisters an existing domain (operator)", tags=["General federation functions"])
 def unregister_domain_endpoint():
     """
     Unregisters an existing domain (operator) from the federation.
@@ -548,18 +247,13 @@ def unregister_domain_endpoint():
         HTTPException:
             - 500: If the domain is not registered or if there is an error during the unregistration process.
     """
-    global domain_registered, block_address
     try:
-        if domain_registered:
-            tx_hash = UnregisterDomain(block_address)
-            domain_registered = False
-            return JSONResponse(content={"tx_hash": tx_hash})
-        else:
-            raise HTTPException(status_code=500, detail="Domain is not registered in the SC")
+        tx_hash = blockchain.unregister_domain()
+        return JSONResponse(content={"tx_hash": tx_hash})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/create_service_announcement", summary="Create service federation announcement", tags=["Consumer DLT federation functions"])
+@app.post("/create_service_announcement", summary="Create service federation announcement", tags=["Consumer functions"])
 def create_service_announcement_endpoint(request: ServiceAnnouncementRequest):
     """
     Consumer announces the need for service federation. 
@@ -581,15 +275,14 @@ def create_service_announcement_endpoint(request: ServiceAnnouncementRequest):
         HTTPException:
             - 500: If there is an error during the service announcement process.
     """
-    global service_id, block_address
     try:
         formatted_requirements = format_service_requirements(request)
-        tx_hash = AnnounceService(block_address, formatted_requirements, "None", "None", "None", "None") 
+        tx_hash, service_id = blockchain.announce_service(formatted_requirements, "None", "None", "None", "None") 
         return JSONResponse(content={"tx_hash": tx_hash, "service_id": service_id})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/service_state", summary="Get service state", tags=["Default DLT federation functions"])
+@app.get("/service_state", summary="Get service state", tags=["General federation functions"])
 async def check_service_state_endpoint(service_id: str = Query(..., description="The service ID to check the state of")):
     """
     Returns the current state of a service by its service ID.
@@ -610,14 +303,14 @@ async def check_service_state_endpoint(service_id: str = Query(..., description=
             - 500: If there is an error retrieving the service state.
     """     
     try:
-        current_service_state = GetServiceState(service_id)
+        current_service_state = blockchain.get_service_state(service_id)
         state_mapping = {0: "open", 1: "closed", 2: "deployed"}
         state = state_mapping.get(current_service_state, "unknown")  # Use 'unknown' if the state is not recognized
         return JSONResponse(content={"service_state": state})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/service_info", summary="Get service info", tags=["Default DLT federation functions"])
+@app.get("/service_info", summary="Get service info", tags=["General federation functions"])
 async def check_deployed_info_endpoint(service_id: str = Query(..., description="The service ID to get the deployed info for the federated service")):
     """
     Retrieves deployment information for a federated service.
@@ -637,9 +330,9 @@ async def check_deployed_info_endpoint(service_id: str = Query(..., description=
         HTTPException:
             - 500: If there is an error retrieving the deployment information.
     """   
-    global domain, block_address
+    global domain
     try:
-        federated_host, service_catalog_db, topology_db, nsd_id, ns_id = GetServiceInfo(service_id, domain, block_address)
+        federated_host, service_catalog_db, topology_db, nsd_id, ns_id = blockchain.get_service_info(service_id, domain)
         
         response_data = {}
         
@@ -667,7 +360,7 @@ async def check_deployed_info_endpoint(service_id: str = Query(..., description=
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/service_announcements", summary="Check service federation announcements", tags=["Provider DLT federation functions"])
+@app.get("/service_announcements", summary="Check service federation announcements", tags=["Provider functions"])
 async def check_service_announcements_endpoint():
     """
     Check for new service announcements in the last 20 blocks.
@@ -685,19 +378,20 @@ async def check_service_announcements_endpoint():
             - 500: If an error occurs while processing the request or fetching the announcements.
     """ 
     try:
-        new_service_event = create_event_filter(FederationEvents.SERVICE_ANNOUNCEMENT, last_n_blocks=20)
+        blocks_to_check = 20
+        new_service_event = blockchain.create_event_filter(blockchain.FederationEvents.SERVICE_ANNOUNCEMENT, last_n_blocks=blocks_to_check)
         new_events = new_service_event.get_all_entries()
         open_services = []
         announcements_received = []
 
         for event in new_events:
-            service_id = web3.toText(event['args']['id']).rstrip('\x00')
-            formatted_requirements = web3.toText(event['args']['requirements']).rstrip('\x00')
+            service_id = Web3.toText(event['args']['id']).rstrip('\x00')
+            formatted_requirements = Web3.toText(event['args']['requirements']).rstrip('\x00')
             requirements = utils.extract_service_requirements(formatted_requirements) # Convert to dict
-            tx_hash = web3.toHex(event['transactionHash'])
+            tx_hash = Web3.toHex(event['transactionHash'])
             block_number = event['blockNumber']
             event_name = event['event']
-            if GetServiceState(service_id) == 0:  # Open services
+            if blockchain.get_service_state(service_id) == 0:  # Open services
                 open_services.append(service_id)
                 announcements_received.append({
                     "service_id": service_id,
@@ -709,12 +403,12 @@ async def check_service_announcements_endpoint():
         if announcements_received:
             return JSONResponse(content={"announcements": announcements_received})
         else:
-            raise HTTPException(status_code=404, detail="No new services announced in the last 20 blocks.")
+            raise HTTPException(status_code=404, detail="No new services announced in the last {blocks_to_check} blocks.")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.post("/place_bid", summary="Place a bid", tags=["Provider DLT federation functions"])
+@app.post("/place_bid", summary="Place a bid", tags=["Provider functions"])
 def place_bid_endpoint(request: PlaceBidRequest):
     """
     Place a bid for a service announcement.
@@ -733,14 +427,13 @@ def place_bid_endpoint(request: PlaceBidRequest):
             - 400: If the provided endpoint format is invalid.
             - 500: If there is an internal server error during bid submission.
     """ 
-    global block_address
     try:
-        tx_hash = PlaceBid(request.service_id, request.service_price, block_address, "None", "None", "None", "None")
+        tx_hash = blockchain.place_bid(request.service_id, request.service_price, "None", "None", "None", "None")
         return JSONResponse(content={"tx_hash": tx_hash})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/bids", summary="Check bids", tags=["Consumer DLT federation functions"]) 
+@app.get("/bids", summary="Check bids", tags=["Consumer functions"]) 
 async def check_bids_endpoint(service_id: str = Query(..., description="The service ID to check bids for")):
     """
     Check for bids placed on a specific service.
@@ -757,15 +450,15 @@ async def check_bids_endpoint(service_id: str = Query(..., description="The serv
     Raises:
         HTTPException: If no bids are found or if there is an internal server error.
     """    
-    global block_address
     try:
-        bids_event = create_event_filter(FederationEvents.NEW_BID, last_n_blocks=20)
+        blocks_to_check = 20
+        bids_event = blockchain.create_event_filter(blockchain.FederationEvents.NEW_BID, last_n_blocks=blocks_to_check)
         new_events = bids_event.get_all_entries()
         bids_received = []
         for event in new_events:
             received_bids = int(event['args']['max_bid_index'])
             if received_bids >= 1:
-                bid_info = GetBidInfo(service_id, received_bids-1, block_address)
+                bid_info = blockchain.get_bid_info(service_id, received_bids-1)
                 bids_received.append({
                     "bid_index": bid_info[2],
                     "provider_address": bid_info[0],
@@ -774,11 +467,11 @@ async def check_bids_endpoint(service_id: str = Query(..., description="The serv
         if bids_received:
             return JSONResponse(content={"bids": bids_received})
         else:
-            raise HTTPException(status_code=404, detail="No new bids in the last 20 blocks.")
+            raise HTTPException(status_code=404, detail="No new bids in the last {blocks_to_check} blocks.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/choose_provider", summary="Choose provider", tags=["Consumer DLT federation functions"])
+@app.post("/choose_provider", summary="Choose provider", tags=["Consumer functions"])
 def choose_provider_endpoint(request: ChooseProviderRequest):
     """
     Choose a provider from the bids received for a federated service.
@@ -796,14 +489,13 @@ def choose_provider_endpoint(request: ChooseProviderRequest):
         HTTPException: 
             - 500: If there is an internal server error during the provider selection process.
     """    
-    global block_address
     try:
-        tx_hash = ChooseProvider(request.service_id, request.bid_index, block_address)
+        tx_hash = blockchain.choose_provider(request.service_id, request.bid_index)
         return JSONResponse(content={"tx_hash": tx_hash})    
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/send_endpoint_info", summary="Send endpoint information for federated service deployment", tags=["Default DLT federation functions"])
+@app.post("/send_endpoint_info", summary="Send endpoint information for federated service deployment", tags=["General federation functions"])
 def send_endpoint_info(request: UpdateEndpointRequest):
     """
     
@@ -822,20 +514,20 @@ def send_endpoint_info(request: UpdateEndpointRequest):
     Raises:
         HTTPException: 
             - 500: If there is an internal server error during the process of sending the endpoint information.
-    """    
-    global block_address
+    """
+    global domain    
     try:            
         service_catalog_db = request.service_catalog_db if request.service_catalog_db is not None else "None"
         nsd_id = request.nsd_id if request.nsd_id is not None else "None"
 
-        tx_hash = UpdateEndpoint(request.service_id, domain, block_address,
+        tx_hash = blockchain.update_endpoint(request.service_id, domain,
                                  service_catalog_db, request.topology_db,
                                  nsd_id, request.ns_id)
         return JSONResponse(content={"tx_hash": tx_hash})    
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.get("/winner_status", summary="Check if a winner has been chosen", tags=["Provider DLT federation functions"])
+@app.get("/winner_status", summary="Check if a winner has been chosen", tags=["Provider functions"])
 async def check_winner_status_endpoint(service_id: str = Query(..., description="The service ID to check if there is a winner provider in the federation")):
     """
     Check if a winner has been chosen for a specific service in the federation.
@@ -852,17 +544,17 @@ async def check_winner_status_endpoint(service_id: str = Query(..., description=
             - 500: If there is an internal server error while checking for the winner.
     """    
     try:
-        winner_chosen_event = create_event_filter(FederationEvents.SERVICE_ANNOUNCEMENT_CLOSED, last_n_blocks=20)
+        winner_chosen_event = blockchain.create_event_filter(blockchain.FederationEvents.SERVICE_ANNOUNCEMENT_CLOSED, last_n_blocks=20)
         new_events = winner_chosen_event.get_all_entries()
         for event in new_events:
-            event_service_id = web3.toText(event['args']['_id']).rstrip('\x00')
+            event_service_id = Web3.toText(event['args']['_id']).rstrip('\x00')
             if event_service_id == service_id:
                 return JSONResponse(content={"winner": "yes"})   
         return JSONResponse(content={"winner": "no"})  
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/is_winner", summary="Check if the calling provider is the winner", tags=["Provider DLT federation functions"])
+@app.get("/is_winner", summary="Check if the calling provider is the winner", tags=["Provider functions"])
 async def check_if_I_am_Winner_endpoint(service_id: str = Query(..., description="The service ID to check if I am the winner provider in the federation")):
     """
     Check if the calling provider is the winner for a specific service.
@@ -878,16 +570,15 @@ async def check_if_I_am_Winner_endpoint(service_id: str = Query(..., description
         HTTPException:
             - 500: If there is an internal server error while checking the winner status.
     """
-    global block_address
     try:
-        if CheckWinner(service_id, block_address):
+        if blockchain.check_winner(service_id):
            return JSONResponse(content={"is_winner": "yes"})
         else:
            return JSONResponse(content={"is_winner": "no"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/service_deployed", summary="Confirm service deployment", tags=["Provider DLT federation functions"])
+@app.post("/service_deployed", summary="Confirm service deployment", tags=["Provider functions"])
 def service_deployed_endpoint(request: ServiceDeployedRequest):
     """
     Confirm the successful deployment of a service by the provider.
@@ -906,10 +597,9 @@ def service_deployed_endpoint(request: ServiceDeployedRequest):
             - 404: If the calling provider is not the winner of the service.
             - 500: If there is an internal server error during the confirmation process.
     """   
-    global block_address
     try:
-        if CheckWinner(request.service_id, block_address):
-            tx_hash = ServiceDeployed(request.service_id, request.federated_host, block_address)
+        if blockchain.check_winner(request.service_id):
+            tx_hash = blockchain.service_deployed(request.service_id, request.federated_host)
             return JSONResponse(content={"tx_hash": tx_hash})
         else:
             raise HTTPException(status_code=404, detail="You are not the winner.")
@@ -918,9 +608,9 @@ def service_deployed_endpoint(request: ServiceDeployedRequest):
 
 
 ###---###
-@app.post("/simulate_consumer_federation_process", tags=["Consumer DLT federation functions"])
+@app.post("/simulate_consumer_federation_process", tags=["Consumer functions"])
 def simulate_consumer_federation_process(request: ConsumerFederationProcessRequest):
-    global block_address, domain, service_id
+    global domain
     try:
         # List to store the timestamps of each federation step
         federation_step_times = []  
@@ -943,17 +633,17 @@ def simulate_consumer_federation_process(request: ConsumerFederationProcessReque
             nsd_id = request.nsd_id if request.nsd_id is not None else "None"
             ns_id = request.ns_id if request.ns_id is not None else "None"
 
-            tx_hash = AnnounceService(block_address, formatted_requirements, service_catalog_db, topology_db, nsd_id, ns_id) 
+            tx_hash, service_id = blockchain.announce_service(formatted_requirements, service_catalog_db, topology_db, nsd_id, ns_id) 
             logger.info(f"📢 Service announcement sent - Service ID: {service_id}")
 
             # Wait for provider bids
-            bids_event = create_event_filter(FederationEvents.NEW_BID)
+            bids_event = blockchain.create_event_filter(blockchain.FederationEvents.NEW_BID)
             bidderArrived = False
             logger.info("⏳ Waiting for bids...")
             while not bidderArrived:
                 new_events = bids_event.get_all_entries()
                 for event in new_events:
-                    event_id = str(web3.toText(event['args']['_id']))
+                    event_id = str(Web3.toText(event['args']['_id']))
                     received_bids = int(event['args']['max_bid_index'])
                     
                     if received_bids >= request.service_providers:
@@ -969,7 +659,7 @@ def simulate_consumer_federation_process(request: ConsumerFederationProcessReque
 
             # Loop through all bid indices and print their information
             for i in range(received_bids):
-                bid_info = GetBidInfo(service_id, i, block_address)
+                bid_info = blockchain.get_bid_info(service_id, i)
                 provider_addr = bid_info[0]
                 bid_price = int(bid_info[1])
                 bid_index = int(bid_info[2])
@@ -988,7 +678,7 @@ def simulate_consumer_federation_process(request: ConsumerFederationProcessReque
             # Choose winner provider
             t_winner_choosen = time.time() - process_start_time
             data.append(['winner_choosen', t_winner_choosen])
-            tx_hash = ChooseProvider(service_id, best_bid_index, block_address)
+            tx_hash = blockchain.choose_provider(service_id, best_bid_index)
             logger.info(f"🏆 Provider selected - Bid index: {best_bid_index}")
 
             logger.info("Endpoint information for application migration and inter-domain connectivity shared.")
@@ -997,16 +687,16 @@ def simulate_consumer_federation_process(request: ConsumerFederationProcessReque
             serviceDeployed = False 
             logger.info(f"⏳ Waiting for provider to complete deployment...")
             while serviceDeployed == False:
-                serviceDeployed = True if GetServiceState(service_id) == 2 else False
+                serviceDeployed = True if blockchain.get_service_state(service_id) == 2 else False
                         
             # Confirmation received
             t_confirm_deployment_received = time.time() - process_start_time
             data.append(['confirm_deployment_received', t_confirm_deployment_received])
             logger.info("✅ Deployment confirmation received.")
-            # DisplayServiceState(service_id)
+            # blockchain.display_service_state(service_id)
 
             # Federated service info
-            federated_host, endpoint_provider_service_catalog_db, endpoint_provider_topology_db, endpoint_provider_nsd_id, endpoint_provider_ns_id = GetServiceInfo(service_id, domain, block_address)
+            federated_host, endpoint_provider_service_catalog_db, endpoint_provider_topology_db, endpoint_provider_nsd_id, endpoint_provider_ns_id = blockchain.get_service_info(service_id, domain)
 
             logger.info(
                 "📡 Federated service info\n"
@@ -1053,11 +743,11 @@ def simulate_consumer_federation_process(request: ConsumerFederationProcessReque
         logger.error(f"Federation process failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))    
 
-@app.post("/simulate_provider_federation_process", tags=["Provider DLT federation functions"])
+@app.post("/simulate_provider_federation_process", tags=["Provider functions"])
 def simulate_provider_federation_process(request: ProviderFederationProcessRequest):
     """
     """  
-    global block_address, domain
+    global domain
     try:
         # List to store the timestamps of each federation step
         federation_step_times = []  
@@ -1076,14 +766,14 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
             ns_id = request.ns_id if request.ns_id is not None else "None"
 
             # Wait for service announcements
-            new_service_event = create_event_filter(FederationEvents.SERVICE_ANNOUNCEMENT)
+            new_service_event = blockchain.create_event_filter(blockchain.FederationEvents.SERVICE_ANNOUNCEMENT)
             logger.info("⏳ Waiting for federation events...")
 
             while newService == False:
                 new_events = new_service_event.get_all_entries()
                 for event in new_events:
-                    service_id = web3.toText(event['args']['id'])
-                    formatted_requirements = web3.toText(event['args']['requirements'])
+                    service_id = Web3.toText(event['args']['id'])
+                    formatted_requirements = Web3.toText(event['args']['requirements'])
                     requirements = utils.extract_service_requirements(formatted_requirements) 
 
                     # Check if this provider can offer the requested service
@@ -1095,7 +785,7 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
                     }
 
 
-                    if GetServiceState(service_id) == 0 and is_match:
+                    if blockchain.get_service_state(service_id) == 0 and is_match:
                         open_services.append(service_id)
                         logger.info(
                             "📨 New service announcement:\n"
@@ -1117,23 +807,23 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
                     newService = True
                 
             service_id = open_services[-1]
-            # DisplayServiceState(service_id)
+            # blockchain.display_service_state(service_id)
 
             # Place a bid offer
             t_bid_offer_sent = time.time() - process_start_time
             data.append(['bid_offer_sent', t_bid_offer_sent])
-            tx_hash = PlaceBid(service_id, request.service_price, block_address, "None", "None", "None", "None")
+            tx_hash = blockchain.place_bid(service_id, request.service_price, "None", "None", "None", "None")
             
             logger.info(f"💰 Bid offer sent - Service ID: {service_id}, Price: {request.service_price} €/hour")
 
             logger.info("⏳ Waiting for a winner to be selected...")
 
-            winner_chosen_event = create_event_filter(FederationEvents.SERVICE_ANNOUNCEMENT_CLOSED)
+            winner_chosen_event = blockchain.create_event_filter(blockchain.FederationEvents.SERVICE_ANNOUNCEMENT_CLOSED)
             winnerChosen = False
             while winnerChosen == False:
                 new_events = winner_chosen_event.get_all_entries()
                 for event in new_events:
-                    event_serviceid = web3.toText(event['args']['_id'])
+                    event_serviceid = Web3.toText(event['args']['_id'])
                     
                     if event_serviceid == service_id:    
                         # Winner choosen received
@@ -1145,7 +835,7 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
             am_i_winner = False
             while am_i_winner == False:
                 # Check if I am the winner
-                am_i_winner = CheckWinner(service_id, block_address)
+                am_i_winner = blockchain.check_winner(service_id)
                 if am_i_winner == True:
                     logger.info(f"🏆 Selected as the winner for service ID: {service_id}.")
                     # Start the deployment of the requested federated service
@@ -1162,7 +852,7 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
 
                     
             # Federated service info
-            federated_host, endpoint_consumer_service_catalog_db, endpoint_consumer_topology_db, endpoint_consumer_nsd_id, endpoint_consumer_ns_id = GetServiceInfo(service_id, domain, block_address)
+            federated_host, endpoint_consumer_service_catalog_db, endpoint_consumer_topology_db, endpoint_consumer_nsd_id, endpoint_consumer_ns_id = blockchain.get_service_info(service_id, domain)
             
             logger.info(
                 "📡 Federated service info\n"
@@ -1195,11 +885,11 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
             t_confirm_deployment_sent = time.time() - process_start_time
             data.append(['confirm_deployment_sent', t_confirm_deployment_sent])
 
-            tx_hash = UpdateEndpoint(service_id, domain, block_address,
+            tx_hash = blockchain.update_endpoint(service_id, domain,
                                  "None", topology_db,
                                  "None", ns_id)
 
-            ServiceDeployed(service_id, federated_host, block_address)
+            blockchain.service_deployed(service_id, federated_host)
             
             total_duration = time.time() - process_start_time
 
@@ -1224,7 +914,7 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
         raise HTTPException(status_code=500, detail=str(e))  
 ###---###
 
-# # # @app.post("/simulate_consumer_federation_process", tags=["Consumer DLT federation functions"])
+# # # @app.post("/simulate_consumer_federation_process", tags=["Consumer functions"])
 # # # def simulate_consumer_federation_process(request: ConsumerFederationProcessRequest):
 # # #     """
 # # #     Simulates the consumer-side service federation process, including the following steps:
@@ -1394,7 +1084,7 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
 # # #         logger.error(f"Federation process failed: {str(e)}")
 # # #         raise HTTPException(status_code=500, detail=str(e))    
 
-# # # @app.post("/simulate_provider_federation_process", tags=["Provider DLT federation functions"])
+# # # @app.post("/simulate_provider_federation_process", tags=["Provider functions"])
 # # # def simulate_provider_federation_process(request: ProviderFederationProcessRequest):
 # # #     """
 # # #     Simulates the provider-side service federation process, including the following steps:

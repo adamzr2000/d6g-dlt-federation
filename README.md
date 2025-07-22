@@ -10,26 +10,26 @@ This repository contains the source code for the **DLT-based Federation** module
 
 1. Clone the repository:
 ```bash
-git clone git@github.com:adamzr2000/dlt-federation-demo.git
-cd dlt-federation-demo
+git clone git@github.com:adamzr2000/d6g-dlt-federation.git
+cd d6g-dlt-federation
 ```
 
 2. Build Docker Images:
-Navigate to the [docker-images](./docker-images) directory and run the `./build.sh` scripts for each image:
+Navigate to the [dockerfiles](./dockerfiles) directory and run the `./build.sh` scripts for each image:
 
-- `dlt-node`: [Go-Ethereum (Geth)](https://geth.ethereum.org/docs) client for creating private Ethereum-based blockchain networks. (detailed info [here](./docker-images/dlt-node/)). ✅ Available 
+- `blockchain-node`: [Go-Ethereum (Geth)](https://geth.ethereum.org/docs) client for creating private Ethereum-based blockchain networks. (detailed info [here](./dockerfiles/blockchain-node/)). ✅ Available 
 
-- `dlt-manager`: REST API built with [FastAPI](https://github.com/fastapi/fastapi) and [Web3.py](https://web3py.readthedocs.io/en/stable/) that exposes endpoints for interacting with the deployed `Federation Smart Contract`. (detailed info [here](./docker-images/dlt-manager/)). ✅ Available 
+- `blockchain-manager`: REST API built with [FastAPI](https://github.com/fastapi/fastapi) and [Web3.py](https://web3py.readthedocs.io/en/stable/) that exposes endpoints for interacting with the deployed `Federation Smart Contract`. (detailed info [here](./dockerfiles/blockchain-manager/)). ✅ Available 
 
-- `truffle`: Development environment for compiling, testing, and deploying the [Federation Smart Contract](./smart-contracts/contracts/Federation.sol) using the [Truffle](https://archive.trufflesuite.com/docs/truffle/) framework.. (detailed info [here](./docker-images/truffle/)). ✅ Available 
+- `truffle`: Development environment for compiling, testing, and deploying the [Federation Smart Contract](./smart-contracts/contracts/Federation.sol) using the [Truffle](https://archive.trufflesuite.com/docs/truffle/) framework.. (detailed info [here](./dockerfiles/truffle/)). ✅ Available 
 
-- `eth-netstats`: Web dashboard for monitoring Ethereum network. (detailed info [here](./docker-images/eth-netstats/)). ✅ Available 
+- `eth-netstats`: Web dashboard for monitoring Ethereum network. (detailed info [here](./dockerfiles/eth-netstats/)). ✅ Available 
 
 ---
 
 ## Blockchain Network Setup
 
-Create a blockchain network using `dlt-node` container images on `Domain1` (bootnode), `Domain2`, and `Domain3`. 
+Create a blockchain network using `blockchain-node` container images on `Domain1` (bootnode), `Domain2`, and `Domain3`. 
 
 ⚠️ Before running the setup scripts, update IP addresses in:
 - [node1.env](./config/dlt/node1.env)
@@ -91,7 +91,7 @@ Each command should show `2 peers`.
 ./deploy_smart_contract.sh --node-ip 127.0.0.1 --ws-port 3334 
 ```
 
-2. Run the `dlt-manager` in each domain
+2. Run the `blockchain-manager` in each domain
 
 Use the appropriate environment file:
 - [domain1.env](./config/federation/domain1.env)
