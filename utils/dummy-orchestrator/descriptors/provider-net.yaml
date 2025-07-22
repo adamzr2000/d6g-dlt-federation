@@ -1,0 +1,8 @@
+network_info:
+  protocol: VXLAN  # The tunneling protocol
+  vxlan_id: 100    # Unique VXLAN ID for the tunnel
+  udp_port: 4789   # UDP port used for VXLAN communication
+  provider_subnet: 192.168.70.0/24  # Subnet used by the provider domain
+  provider_router_endpoint: 10.5.98.105    # Router endpoint in the provider domain
+  consumer_tunnel_endpoint: 172.28.0.1/30  # Tunnel endpoint IP in the consumer domain (with CIDR)
+  provider_tunnel_endpoint: 172.28.0.2/30  # Tunnel endpoint IP in the provider domain (with CIDR)

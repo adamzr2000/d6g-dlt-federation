@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: roscore
+spec:
+  containers:
+    - name: roscore
+      image: ros-app
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: ROS_MASTER_URI
+          value: "http://10.11.7.4:11311" 
+        - name: ROS_IP
+          value: "10.11.7.4"
+        - name: ROS_ROLE
+          value: "roscore"
+  hostNetwork: true
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ros-publisher
+spec:
+  containers:
+    - name: ros-publisher
+      image: ros-app
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: ROS_MASTER_URI
+          value: "http://10.11.7.4:11311" 
+        - name: ROS_IP
+          value: "10.11.7.4"
+        - name: ROS_ROLE
+          value: "publisher"          
+        - name: ROS_TOPIC
+          value: "chatter"
+        - name: ROS_RATE
+          value: "2.0"
+        - name: ROS_MESSAGE
+          value: "Hello from consumer ROS node"
+  hostNetwork: true

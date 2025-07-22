@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.21 <0.7.0;
+pragma experimental ABIEncoderV2;
 
 // Define the smart contract
 contract Federation {
@@ -13,13 +14,20 @@ contract Federation {
         bool registered;
     }
 
+    struct Endpoint {
+        bytes32 service_catalog_db;
+        bytes32 topology_db;
+        bytes32 nsd_id;
+        bytes32 ns_id; 
+    }
+
     // Define the Service struct
     struct Service {
         address creator;
-        bytes endpoint_consumer; // Changed from bytes32 to bytes
+        bytes32 endpoint_consumer; 
         bytes32 id;
         address provider;
-        bytes endpoint_provider; // Changed from bytes32 to bytes
+        bytes32 endpoint_provider; 
         bytes req_info;
         ServiceState state;
     }
@@ -28,7 +36,7 @@ contract Federation {
     struct Bid {
         address bid_address;
         uint price;
-        bytes endpoint_provider; // Changed from bytes32 to bytes
+        bytes32 endpoint_provider;
     }
     
     // Define mappings to store data
@@ -36,6 +44,7 @@ contract Federation {
     mapping(bytes32 => Bid[]) public bids;
     mapping(bytes32 => Service) public service;
     mapping(address => Operator) public operator;
+    mapping(bytes32 => Endpoint) public endpoints;
     
     // Define events
     event OperatorRegistered(address operator, bytes32 name);
@@ -67,41 +76,85 @@ contract Federation {
         return current_operator.name;
     }
 
-    function AnnounceService(bytes memory _requirements, bytes memory _endpoint_consumer, bytes32 _id) public returns(ServiceState) {
+    function AnnounceService(bytes memory _requirements, bytes32 _id,
+                             bytes32 endpoint_service_catalog_db, bytes32 endpoint_topology_db,
+                             bytes32 endpoint_nsd_id, bytes32 endpoint_ns_id) public returns(ServiceState) {
         Operator storage current_operator = operator[msg.sender];
         Service storage current_service = service[_id];
         require(current_operator.registered == true, "Operator is not registered. Can not bid. Please register.");
         require(current_service.id != _id, "Service ID for operator already exists");
-
-        service[_id] = Service(msg.sender, _endpoint_consumer, _id, msg.sender, _endpoint_consumer, _requirements, ServiceState.Open);
+        bytes32 endpoint_keccak = keccak256(abi.encodePacked(endpoint_service_catalog_db, endpoint_topology_db, endpoint_nsd_id, endpoint_ns_id));
+        endpoints[endpoint_keccak] = Endpoint(endpoint_service_catalog_db, endpoint_topology_db, endpoint_nsd_id, endpoint_ns_id);
+        service[_id] = Service(msg.sender, endpoint_keccak, _id, msg.sender, endpoint_keccak, _requirements, ServiceState.Open);
         emit ServiceAnnouncement(_requirements, _id);
         return ServiceState.Open;
     }
 
+    function UpdateEndpoint(bool provider, bytes32 _id,
+                            bytes32 endpoint_service_catalog_db, bytes32 endpoint_topology_db,
+                            bytes32 endpoint_nsd_id, bytes32 endpoint_ns_id) public returns (bool) {
+        Operator storage current_operator = operator[msg.sender];
+        Service storage current_service = service[_id];
+        bytes32 endpoint_keccak = keccak256(abi.encodePacked(endpoint_service_catalog_db, endpoint_topology_db, endpoint_nsd_id, endpoint_ns_id));
+        require(current_operator.registered == true, "Operator is not registered. Can not look into. Please register.");
+        require(current_service.state >= ServiceState.Open, "Service is closed or not exists");
+        if(provider == true) {
+                require(current_service.state >= ServiceState.Closed, "Service is still open or not exists");
+                require(current_service.provider == msg.sender, "This domain is not a winner");
+                endpoints[endpoint_keccak] = Endpoint(endpoint_service_catalog_db, endpoint_topology_db, endpoint_nsd_id, endpoint_ns_id);
+                service[_id].endpoint_provider = endpoint_keccak;
+                return true;
+        }
+        else {
+                require(current_service.creator == msg.sender, "This domain is not a creator");
+                endpoints[endpoint_keccak] = Endpoint(endpoint_service_catalog_db, endpoint_topology_db, endpoint_nsd_id, endpoint_ns_id);
+                service[_id].endpoint_consumer = endpoint_keccak;
+                return true;
+        }
+    }
+        
     function GetServiceState(bytes32 _id) public view returns (ServiceState) {
         return service[_id].state;
     }
 
-    function GetServiceInfo(bytes32 _id, bool provider, address call_address) public view returns (bytes32, bytes memory, bytes memory) {
+    function GetServiceInfo(bytes32 _id, bool provider, address call_address) public view returns (bytes32, bytes memory, bytes32, bytes32, bytes32, bytes32) {
         Operator storage current_operator = operator[call_address];
         Service storage current_service = service[_id];
         require(current_operator.registered == true, "Operator is not registered. Can not look into. Please register.");
         require(current_service.state >= ServiceState.Closed, "Service is still open or not exists");
         if(provider == true) {
             require(current_service.provider == call_address, "This domain is not a winner");
-            return(current_service.id, current_service.endpoint_consumer, current_service.req_info);
+            Endpoint storage current_endpoint = endpoints[current_service.endpoint_consumer];
+            return(current_service.id, current_service.req_info,
+                   current_endpoint.service_catalog_db, current_endpoint.topology_db,
+                   current_endpoint.nsd_id, current_endpoint.ns_id);
         } else {
             require(current_service.creator == call_address, "This domain is not a creator");
-            return(current_service.id, current_service.endpoint_provider, current_service.req_info);
+            Endpoint storage current_endpoint = endpoints[current_service.endpoint_provider];
+            return(current_service.id, current_service.req_info,
+                   current_endpoint.service_catalog_db, current_endpoint.topology_db,
+                   current_endpoint.nsd_id, current_endpoint.ns_id);
         }
     }
 
-    function PlaceBid(bytes32 _id, uint32 _price, bytes memory _endpoint) public returns (uint256) {
+    function GetEndpoint(bytes32 endpoint_id, address call_address) public view returns (bytes32, bytes32, bytes32, bytes32) {
+        Operator storage current_operator = operator[call_address];
+        Endpoint storage current_endpoint = endpoints[endpoint_id];
+        require(current_operator.registered == true, "Operator is not registered. Can not look into. Please register.");
+        return(current_endpoint.service_catalog_db, current_endpoint.topology_db,
+               current_endpoint.nsd_id, current_endpoint.ns_id);
+    }
+
+    function PlaceBid(bytes32 _id, uint32 _price,
+                      bytes32 endpoint_service_catalog_db, bytes32 endpoint_topology_db,
+                      bytes32 endpoint_nsd_id, bytes32 endpoint_ns_id) public returns (uint256) {
         Operator storage current_operator = operator[msg.sender];
         Service storage current_service = service[_id];
         require(current_operator.registered == true, "Operator is not registered. Can not bid. Please register.");
         require(current_service.state == ServiceState.Open, "Service is closed or not exists");
-        uint256 max_bid_index = bids[_id].push(Bid(msg.sender, _price, _endpoint));
+        bytes32 endpoint_keccak = keccak256(abi.encodePacked(endpoint_service_catalog_db, endpoint_topology_db, endpoint_nsd_id, endpoint_ns_id));
+        endpoints[endpoint_keccak] = Endpoint(endpoint_service_catalog_db, endpoint_topology_db, endpoint_nsd_id, endpoint_ns_id);
+        uint256 max_bid_index = bids[_id].push(Bid(msg.sender, _price, endpoint_keccak));
         bidCount[_id] = max_bid_index;
         emit NewBid(_id, max_bid_index);
         return max_bid_index;
@@ -123,7 +176,7 @@ contract Federation {
         return (current_bid_pool[bider_index].bid_address, current_bid_pool[bider_index].price, bider_index);
     }
 
-    function ChooseProvider(bytes32 _id, uint256 bider_index) public returns (bytes memory endpoint_provider) {
+    function ChooseProvider(bytes32 _id, uint256 bider_index) public returns (bool) {
         Service storage current_service = service[_id];
         Bid[] storage current_bid_pool = bids[_id];
         require(current_service.id == _id, "Service not exists");
@@ -134,7 +187,7 @@ contract Federation {
         service[_id].provider = current_bid_pool[bider_index].bid_address;
         service[_id].endpoint_provider = current_bid_pool[bider_index].endpoint_provider;
         emit ServiceAnnouncementClosed(_id);
-        return service[_id].endpoint_provider;
+        return true;
     }
 
     function isWinner(bytes32 _id, address _winner) public view returns (bool) {

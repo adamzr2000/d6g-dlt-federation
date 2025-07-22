@@ -1,34 +1,14 @@
 #!/bin/bash
 
-# Path to the node1 environment file
-NODE_ENV_FILE="../config/dlt/node1.env"
+# Run truffle migrate command and capture the output
+output=$(truffle migrate --network dlt_network)
 
-# Function to load environment variables from node1.env
-load_env_vars() {
-  if [ -f "$NODE_ENV_FILE" ]; then
-    echo "Loading environment variables from $NODE_ENV_FILE"
-    source "$NODE_ENV_FILE"  # Load the environment file to access variables directly
-  else
-    echo "Environment file $NODE_ENV_FILE not found!"
-    exit 1
-  fi
-}
+# Print the output
+echo "$output"
 
-# Load the environment variables
-load_env_vars
+# Extract the contract address using grep and awk
+contract_address=$(echo "$output" | grep "contract address:" | awk '{print $4}')
 
-# Construct the start command for deploying the smart contract
-START_CMD="./deploy_smart_contract.sh"
-
-# Start a Docker container with the specified configurations
-docker run \
-  -it \
-  --rm \
-  --name truffle \
-  --hostname truffle \
-  --network host \
-  -v "$(pwd)/.":/smart-contracts \
-  -e NODE_IP="$NODE_IP" \
-  -e WS_PORT="$WS_PORT" \
-  truffle:latest \
-  $START_CMD
+# Save the contract address in the ../code/ directory
+echo "CONTRACT_ADDRESS=$contract_address" > ./smart-contract.env
+echo "Contract Address saved in smart-contract.env file: $contract_address"

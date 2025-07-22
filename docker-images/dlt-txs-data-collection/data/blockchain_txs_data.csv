@@ -1,2 +1,0 @@
-blockNumber,timestamp,transactionHash,from,to,value,gas,gasPrice,nonce,status,contractAddress,contractName,functionName
-76,1729362165,0xcb59eea2ace7e9d615034e09f5b8b3f354147d0a9ce7499a95aeb4453db722ad,0x5a3174CB9655b0f3Ffb90392e1F4C96D85954E61,0x0A3D585486858Cb365f1cD2F77aAb1fe5B855d10,0.1,21000,20,1,1,None,None,None

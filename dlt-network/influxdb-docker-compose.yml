@@ -1,0 +1,65 @@
+version: '3'
+services:
+  influxdb:
+    image: influxdb:1.8
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      INFLUXDB_HTTP_FLUX_ENABLED: "false"
+      INFLUXDB_HTTP_AUTH_ENABLED: "false"
+      INFLUXDB_DB: "geth"
+    restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    volumes:
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+    environment:
+       GF_SECURITY_ADMIN_USER: "desire6g"
+       GF_SECURITY_ADMIN_PASSWORD: "desire6g2024;"
+    depends_on:
+      - influxdb
+    ports:
+      - "3000:3000"
+    restart: always
+
+  bootnode:
+    image: dlt-node
+    container_name: bootnode
+    hostname: bootnode
+    depends_on:
+      - influxdb
+    volumes:
+      - ./../config/dlt/bootnode.env:/dlt-network/.env
+    command: ./bootnode_start.sh
+    network_mode: "host"
+    restart: always
+
+  node1:
+    image: dlt-node
+    container_name: node1
+    hostname: node1
+    depends_on:
+      - bootnode
+    volumes:
+      - ./../config/dlt/node1.env:/dlt-network/.env
+      - ./../config/dlt/genesis/genesis_2_validators.json:/dlt-network/genesis.json
+    command: ./node_start.sh
+    network_mode: "host"
+    restart: always
+
+  # dlt-txs-monitoring:
+  #   image: dlt-txs-monitoring
+  #   container_name: dlt-txs-monitoring
+  #   depends_on:
+  #     - node1
+  #   volumes:
+  #     - ./data:/app/data
+  #     - ./../smart-contracts":/app/smart-contracts
+  #   environment:
+  #      ETH_NODE_URL: "ws://10.5.30.10:3334"
+  #      CONTRACT_ADDRESS: "0x8a899B9fF6293789A9Ed8716e08e5fCA83e975af"
+  #   restart: always
