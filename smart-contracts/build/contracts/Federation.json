@@ -28125,10 +28125,16 @@
       "links": {},
       "address": "0xBEd601937431925036638a3464E5Dd3A31AE65e1",
       "transactionHash": "0x7e64ecbadbd78a8ecae69afab71cab752fde7c24fec6ec6e0d3835aae0f08c9e"
+    },
+    "2025": {
+      "events": {},
+      "links": {},
+      "address": "0xc17C7dd3288dA3119Ffa60568B7c4196FCB38DfB",
+      "transactionHash": "0x6a43583f1c2201403134cb0765944d2b8e3f95d3fc0974152898400566ea4e77"
     }
   },
   "schemaVersion": "3.4.16",
-  "updatedAt": "2025-04-12T08:58:48.900Z",
+  "updatedAt": "2025-07-23T20:56:48.686Z",
   "networkType": "ethereum",
   "devdoc": {
     "methods": {}

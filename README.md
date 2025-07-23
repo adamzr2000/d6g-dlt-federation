@@ -21,7 +21,7 @@ Navigate to the [dockerfiles](./dockerfiles) directory and run the `./build.sh` 
 
 - `blockchain-manager`: REST API built with [FastAPI](https://github.com/fastapi/fastapi) and [Web3.py](https://web3py.readthedocs.io/en/stable/) that exposes endpoints for interacting with the deployed `Federation Smart Contract`. (detailed info [here](./dockerfiles/blockchain-manager/)). ✅ Available 
 
-- `truffle`: Development environment for compiling, testing, and deploying the [Federation Smart Contract](./smart-contracts/contracts/Federation.sol) using the [Truffle](https://archive.trufflesuite.com/docs/truffle/) framework.. (detailed info [here](./dockerfiles/truffle/)). ✅ Available 
+- `truffle`: Development environment for compiling, testing, and deploying the [Federation Smart Contract](./smart-contracts/contracts/Federation.sol) using the [Truffle](https://archive.trufflesuite.com/docs/truffle/) framework. (detailed info [here](./dockerfiles/truffle/)). ✅ Available 
 
 - `eth-netstats`: Web dashboard for monitoring Ethereum network. (detailed info [here](./dockerfiles/eth-netstats/)). ✅ Available 
 
@@ -29,56 +29,46 @@ Navigate to the [dockerfiles](./dockerfiles) directory and run the `./build.sh` 
 
 ## Blockchain Network Setup
 
-Create a blockchain network using `blockchain-node` container images on `Domain1` (bootnode), `Domain2`, and `Domain3`. 
+Create a blockchain network using `blockchain-node` container image on `Domain1` (bootnode), `Domain2`, and `Domain3`. 
 
 ⚠️ Before running the setup scripts, update IP addresses in:
-- [node1.env](./config/dlt/node1.env)
-- [node2.env](./config/dlt/node2.env)
-- [node3.env](./config/dlt/node3.env)
+- [domain1.env](./blockhain-network/geth-poa/config/domain1.env)
+- [domain2.env](./blockhain-network/geth-poa/config/domain2.env)
+- [domain3.env](./blockhain-network/geth-poa/config/domain3.env)
 
 
 1. Initialize Network (Domain1):
 
 ```bash
-cd dlt-network
-./start_dlt_network.sh
+./start_geth_net.sh --file domain1-geth-network.yml
 ```
 
 2. Join Network (Domain2)
 
 ```bash
-cd dlt-network
-./join_dlt_network.sh --node node2 --validators 3
+./start_geth_net.sh --file domain2-geth-network.yml
 ```
 
 3. Join Network (Domain3)
 
 ```bash
-cd dlt-network
-./join_dlt_network.sh --node node3 --validators 3
+./start_geth_net.sh --file domain3-geth-network.yml
 ```
-
-4. Verify Node Connectivity
-
-```bash
-# Domain1
-./get_peer_nodes.sh --node node1
-
-# Domain2  
-./get_peer_nodes.sh --node node2
-
-# Domain3  
-./get_peer_nodes.sh --node node3
-```
-
-Each command should show `2 peers`.
 
 📊 Network Dashboard: [http://localhost:3000](http://localhost:3000)
 
-5. Stop Network (Domain1):
+4. Delete Network (all)
 
 ```bash
-./stop_dlt_network.sh
+./stop_geth_net.sh --file domain1-geth-network.yml
+```
+
+```bash
+./stop_geth_net.sh --file domain2-geth-network.yml
+```
+
+```bash
+./stop_geth_net.sh --file domain3-geth-network.yml
 ```
 
 ---
@@ -88,7 +78,7 @@ Each command should show `2 peers`.
 1. Deploy the `Federation Smart Contract`
 
 ```bash
-./deploy_smart_contract.sh --node-ip 127.0.0.1 --ws-port 3334 
+./deploy_smart_contract.sh --node-ip 127.0.0.1 --port 3334 --protocol ws
 ```
 
 2. Run the `blockchain-manager` in each domain

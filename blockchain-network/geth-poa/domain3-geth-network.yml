@@ -1,0 +1,18 @@
+# version: '3'
+x-common-commands:
+  node_entrypoint: &node_entrypoint >
+    bash -c "
+    ./start_node.sh
+    "
+services:
+
+  node3:
+    image: blockchain-node:geth-poa
+    container_name: node3
+    env_file:
+      - domain3.env
+    command: *node_entrypoint
+    volumes:
+      - "./config:/src/"
+    network_mode: host
+    restart: always

@@ -4,7 +4,7 @@
 node_ip=""
 port=""
 protocol="ws"      # default
-network_id="2024"  # default
+network_id="2025"  # default
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
