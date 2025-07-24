@@ -1,4 +1,4 @@
-# version: '3'
+version: '3'
 x-common-commands:
   node_entrypoint: &node_entrypoint >
     bash -c "
@@ -8,29 +8,33 @@ services:
   bootnode:
     image: blockchain-node:geth-poa
     container_name: bootnode
+    hostname: bootnode
     env_file:
       - bootnode.env
     command: *node_entrypoint
+    network_mode: "host"
     volumes:
       - "./config:/src/"
-    network_mode: host
     restart: always
 
   node1:
     image: blockchain-node:geth-poa
     container_name: node1
+    hostname: node1
     env_file:
       - domain1.env
     command: *node_entrypoint
     volumes:
       - "./config:/src/"
-    network_mode: host
+    depends_on:
+      - bootnode
+    network_mode: "host"
     restart: always
 
   eth-netstats:
     image: eth-netstats
     container_name: eth-netstats
+    network_mode: "host"
     depends_on:
       - node1
-    network_mode: host
     restart: always

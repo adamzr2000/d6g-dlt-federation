@@ -28130,11 +28130,11 @@
       "events": {},
       "links": {},
       "address": "0xc17C7dd3288dA3119Ffa60568B7c4196FCB38DfB",
-      "transactionHash": "0x6a43583f1c2201403134cb0765944d2b8e3f95d3fc0974152898400566ea4e77"
+      "transactionHash": "0x3a5cfd9e196e37e4fd8b9c7c92bd80b37b30464c9f478f4bfda2ae64c5e6d626"
     }
   },
   "schemaVersion": "3.4.16",
-  "updatedAt": "2025-07-23T20:56:48.686Z",
+  "updatedAt": "2025-07-24T17:23:51.157Z",
   "networkType": "ethereum",
   "devdoc": {
     "methods": {}

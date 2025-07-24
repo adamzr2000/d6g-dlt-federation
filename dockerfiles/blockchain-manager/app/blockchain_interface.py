@@ -5,7 +5,8 @@ import time
 import logging
 from enum import Enum
 from web3 import Web3, WebsocketProvider, HTTPProvider
-from self.web3.middleware import geth_poa_middleware
+from web3.middleware import geth_poa_middleware
+
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)

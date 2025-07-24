@@ -1,19 +1,23 @@
 import os
-import json
 import time
-from pathlib import Path
 import logging
-from dotenv import load_dotenv
-from web3 import Web3, WebsocketProvider
-from web3.middleware import geth_poa_middleware
+
+from web3 import Web3
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from typing import Optional, List
-from enum import Enum
 
 import utils
-from blockchain_interface import BlockchainInterface
+from blockchain_interface import BlockchainInterface, FederationEvents
+from models import (
+    TransactionReceiptResponse,
+    DomainRegistrationRequest,
+    ServiceAnnouncementRequest,
+    UpdateEndpointRequest,
+    PlaceBidRequest,
+    ChooseProviderRequest,
+    ServiceDeployedRequest,
+    ConsumerFederationProcessRequest,
+    ProviderFederationProcessRequest,
+)
 
 # Define FastAPI app and OpenAPI metadata
 tags_metadata = [
@@ -29,21 +33,37 @@ app = FastAPI(
     openapi_tags=tags_metadata
 )
 
+domain           = os.getenv("DOMAIN_FUNCTION", "").strip().lower()
+eth_address      = os.getenv("ETH_ADDRESS")
+eth_private_key  = os.getenv("ETH_PRIVATE_KEY")
+eth_node_url     = os.getenv("ETH_NODE_URL")
+contract_addr_raw= os.getenv("CONTRACT_ADDRESS")
+
+# -- guard against missing configurations --
+required = {
+    "DOMAIN_FUNCTION": domain,
+    "ETH_ADDRESS":      eth_address,
+    "ETH_PRIVATE_KEY":  eth_private_key,
+    "ETH_NODE_URL":     eth_node_url,
+    "CONTRACT_ADDRESS": contract_addr_raw,
+}
+missing = [k for k,v in required.items() if not v]
+if missing:
+    raise RuntimeError(f"ERROR: missing environment variables: {', '.join(missing)}")
+
+# -- validate & normalize the contract address --
+try:
+    contract_address = Web3.toChecksumAddress(contract_addr_raw)
+except Exception:
+    raise RuntimeError(f"ERROR: CONTRACT_ADDRESS '{contract_addr_raw}' is not a valid Ethereum address")
+
+# -- validate domain --
+if domain not in ("provider", "consumer"):
+    raise RuntimeError(f"ERROR: DOMAIN_FUNCTION must be 'provider' or 'consumer', got '{domain}'")
+
 # Initialize logging
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Load environment variables
-try:
-    domain = os.getenv('DOMAIN_FUNCTION', '').strip().lower()
-    eth_address = os.getenv('ETH_ADDRESS')
-    eth_private_key = os.getenv('ETH_PRIVATE_KEY')
-    eth_node_url = os.getenv('ETH_NODE_URL')
-    contract_address = Web3.toChecksumAddress(os.getenv('CONTRACT_ADDRESS'))
-
-except Exception as e:
-    logger.error(f"Error loading configuration: {e}")
-    raise
 
 # Initialize blockchain interface
 blockchain = BlockchainInterface(
@@ -54,89 +74,11 @@ blockchain = BlockchainInterface(
     contract_address=contract_address
 )
 
-# Pydantic Models
-class TransactionReceiptResponse(BaseModel):
-    blockHash: str
-    blockNumber: int
-    transactionHash: str
-    gasUsed: int
-    cumulativeGasUsed: int
-    status: int
-    from_address: str
-    to_address: str
-    logs: list
-    logsBloom: str
-    effectiveGasPrice: int
-
-class DomainRegistrationRequest(BaseModel):
-    name: str
-
-class ServiceAnnouncementRequest(BaseModel):
-    service_type: Optional[str] = "k8s_deployment"
-    bandwidth_gbps: Optional[float] = None 
-    rtt_latency_ms: Optional[int] = None 
-    compute_cpus: Optional[int] = None 
-    compute_ram_gb: Optional[int] = None 
-    
-class UpdateEndpointRequest(BaseModel):
-    service_id: str
-    topology_db: str
-    ns_id: str 
-    service_catalog_db: Optional[str] = None
-    nsd_id: Optional[str] = None
-
-class PlaceBidRequest(BaseModel):
-    service_id: str
-    service_price: int
-
-class ChooseProviderRequest(BaseModel):
-    bid_index: int
-    service_id: str
-
-class ServiceDeployedRequest(BaseModel):
-    service_id: str
-    federated_host: str
-
-class ConsumerFederationProcessRequest(BaseModel):
-    # Flag to indicate whether results should be exported to a CSV file
-    export_to_csv: Optional[bool] = False
-    csv_path: Optional[str] = None
-
-    # Minimum number of service providers required before making a selection
-    service_providers: Optional[int] = 1
-
-    # Endpoint info
-    topology_db: str
-    ns_id: str 
-    service_catalog_db: Optional[str] = None
-    nsd_id: Optional[str] = None
-
-    # Service requirements
-    service_type: Optional[str] = "k8s_deployment"
-    bandwidth_gbps: Optional[float] = None 
-    rtt_latency_ms: Optional[int] = None 
-    compute_cpus: Optional[int] = None 
-    compute_ram_gb: Optional[int] = None 
-
-class ProviderFederationProcessRequest(BaseModel):
-    # Flag to indicate whether results should be exported to a CSV file
-    export_to_csv: Optional[bool] = False
-    csv_path: Optional[str] = None
-
-    offered_service: Optional[str] = "k8s_deployment"
-    
-    # Endpoint info
-    topology_db: Optional[str] = None
-    ns_id: Optional[str] = None 
-    
-    # The price of the service offered by the provider
-    service_price: Optional[int] = 10
-
 
 # Function to format service requirements in key=value; format with all fields included
 def format_service_requirements(request: ServiceAnnouncementRequest) -> str:
     fields = []
-    
+
     # Ensure all fields are included, even if the value is None
     fields.append(f"service_type={request.service_type or 'None'}")
     fields.append(f"bandwidth_gbps={request.bandwidth_gbps if request.bandwidth_gbps is not None else 'None'}")
@@ -150,187 +92,59 @@ def format_service_requirements(request: ServiceAnnouncementRequest) -> str:
 
 # API Endpoints
 @app.get("/web3_info", summary="Get Web3 info", tags=["General federation functions"])
-async def web3_info_endpoint():
-    """
-    Retrieve Web3 connection details.
-
-    Returns:
-        JSONResponse: A JSON object containing:
-            - ethereum_node_url (str): The URL of the connected Ethereum node.
-            - ethereum_address (str): The Ethereum address associated with the connected node.
-            - contract_address (str): The address of the deployed Federation Smart Contract (SC).
-
-    Raises:
-        HTTPException:
-            - 500: If there is an issue retrieving the Ethereum node or Web3 connection information.
-    """
-    global eth_node_url, eth_address, contract_address
+def web3_info_endpoint():
     try:
-        web3_info = {
-            "ethereum_node_url": eth_node_url,
-            "ethereum_address": eth_address,
-            "contract_address": contract_address
-        }
-        return JSONResponse(content={"web3_info": web3_info})
+        return {"ethereum_node_url": eth_node_url,
+                "ethereum_address": eth_address,
+                "contract_address": contract_address}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/tx_receipt", summary="Get transaction receipt", tags=["General federation functions"], response_model=TransactionReceiptResponse)
-async def tx_receipt_endpoint(tx_hash: str = Query(..., description="The transaction hash to retrieve the receipt")):
-    """
-    Retrieves the transaction receipt details for a specified transaction hash.
-
-    Args:
-        - tx_hash (str): The transaction hash for which the receipt is requested.
-
-    Returns:
-        JSONResponse: A JSON object containing:
-            - blockHash (str): The hash of the block containing the transaction.
-            - blockNumber (int): The block number in which the transaction was included.
-            - transactionHash (str): The transaction hash.
-            - gasUsed (int): The amount of gas used for the transaction.
-            - cumulativeGasUsed (int): The cumulative gas used by all transactions in the block up to and including this one.
-            - status (int): Transaction status (`1` for success, `0` for failure).
-            - from_address (str): The sender’s address.
-            - to_address (str): The recipient’s address.
-            - logs (list): A list of event logs generated during the transaction.
-            - logsBloom (str): A bloom filter for quick searching of logs.
-            - effectiveGasPrice (int): The actual gas price paid for the transaction.
-
-    Raises:
-        HTTPException:
-            - 500: If there is an issue retrieving the transaction receipt from the blockchain.
-    """
+def tx_receipt_endpoint(tx_hash: str = Query(..., description="The transaction hash to retrieve the receipt")):
     try:
-        # Get the transaction receipt
-        receipt_dict = blockchain.get_transaction_receipt(tx_hash)
-        return JSONResponse(content={"tx_receipt": receipt_dict})
+        return blockchain.get_transaction_receipt(tx_hash)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.post("/register_domain", summary="Register a new domain (operator)", tags=["General federation functions"])
 def register_domain_endpoint(request: DomainRegistrationRequest):
-    """
-    Registers a new domain (operator) in the federation.
-
-     Args:
-        request (DomainRegistrationRequest): A Pydantic model containing the following fields:
-            - name (str): The name of the domain to register as an operator.
-
-    Returns:
-        JSONResponse: A JSON object containing:
-            - tx_hash (str): The transaction hash of the sent registration transaction.
-
-    Raises:
-        HTTPException:
-            - 500: If the domain is already registered or if there is an error during the registration process.
-    """
     try:
         tx_hash = blockchain.register_domain(request.name)
-        return JSONResponse(content={"tx_hash": tx_hash})
+        return {"tx_hash": tx_hash}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.delete("/unregister_domain", summary="Unregisters an existing domain (operator)", tags=["General federation functions"])
 def unregister_domain_endpoint():
-    """
-    Unregisters an existing domain (operator) from the federation.
-
-    Args:
-        None
-
-    Returns:
-        JSONResponse: A JSON object containing:
-            - tx_hash (str): The transaction hash of the sent unregistration transaction.
-
-    Raises:
-        HTTPException:
-            - 500: If the domain is not registered or if there is an error during the unregistration process.
-    """
     try:
         tx_hash = blockchain.unregister_domain()
-        return JSONResponse(content={"tx_hash": tx_hash})
+        return {"tx_hash": tx_hash}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/create_service_announcement", summary="Create service federation announcement", tags=["Consumer functions"])
 def create_service_announcement_endpoint(request: ServiceAnnouncementRequest):
-    """
-    Consumer announces the need for service federation. 
-
-    Args:
-        request (ServiceAnnouncementRequest): A Pydantic model containing the following fields:
-            - service_type (str, optional): The type of the service (default: "K8s App Deployment").
-            - bandwidth_gbps (float, optional): The required bandwidth in Gbps (default: None).
-            - rtt_latency_ms (int, optional): The required round-trip latency in ms (default: None).
-            - compute_cpus (int, optional): The required number of CPUs for the service (default: None).
-            - compute_ram_gb (int, optional): The required amount of RAM in GB (default: None).
-
-    Returns:
-        JSONResponse: A JSON object containing:
-            - tx_hash (str): The transaction hash of the service announcement.
-            - service_id (str): The unique identifier for the service.
-
-    Raises:
-        HTTPException:
-            - 500: If there is an error during the service announcement process.
-    """
     try:
         formatted_requirements = format_service_requirements(request)
         tx_hash, service_id = blockchain.announce_service(formatted_requirements, "None", "None", "None", "None") 
-        return JSONResponse(content={"tx_hash": tx_hash, "service_id": service_id})
+        return {"tx_hash": tx_hash, "service_id": service_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/service_state", summary="Get service state", tags=["General federation functions"])
-async def check_service_state_endpoint(service_id: str = Query(..., description="The service ID to check the state of")):
-    """
-    Returns the current state of a service by its service ID.
-    
-    Args:
-        - service_id (str): The unique identifier of the service whose state is being queried.
-
-    Returns:
-        JSONResponse: A JSON object containing:
-            - service_state (str): The current state of the service, which can be:
-                - 'open' (0)
-                - 'closed' (1)
-                - 'deployed' (2)
-                - 'unknown' if the state is unrecognized.
-
-    Raises:
-        HTTPException:
-            - 500: If there is an error retrieving the service state.
-    """     
+def check_service_state_endpoint(service_id: str = Query(..., description="The service ID to check the state of")): 
     try:
         current_service_state = blockchain.get_service_state(service_id)
         state_mapping = {0: "open", 1: "closed", 2: "deployed"}
-        state = state_mapping.get(current_service_state, "unknown")  # Use 'unknown' if the state is not recognized
-        return JSONResponse(content={"service_state": state})
+        return {"service_state": state_mapping.get(current_service_state, "unknown")}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/service_info", summary="Get service info", tags=["General federation functions"])
-async def check_deployed_info_endpoint(service_id: str = Query(..., description="The service ID to get the deployed info for the federated service")):
-    """
-    Retrieves deployment information for a federated service.
-
-    Args:
-        - service_id (str): The unique identifier of the deployed service.
-
-    Returns:
-        JSONResponse: A JSON object containing:
-            - federated_host (str): The external IP address of the deployed service.
-            - endpoint_provider or endpoint_consumer (dict): Contains:
-                - service_catalog_db (str)
-                - topology_db (str)
-                - nsd_id (str)
-                - ns_id (str)
-    Raises:
-        HTTPException:
-            - 500: If there is an error retrieving the deployment information.
-    """   
-    global domain
+def check_deployed_info_endpoint(service_id: str = Query(..., description="The service ID to get the deployed info for the federated service")):
     try:
         federated_host, service_catalog_db, topology_db, nsd_id, ns_id = blockchain.get_service_info(service_id, domain)
         
@@ -356,30 +170,15 @@ async def check_deployed_info_endpoint(service_id: str = Query(..., description=
                     "ns_id": ns_id
                 }
             }      
-        return JSONResponse(content=response_data)
+        return response_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/service_announcements", summary="Check service federation announcements", tags=["Provider functions"])
-async def check_service_announcements_endpoint():
-    """
-    Check for new service announcements in the last 20 blocks.
-
-    Returns:
-        JSONResponse: A JSON object containing a list of service announcements, where each announcement includes:
-            - service_id (str): The unique identifier of the announced federated service.
-            - service_requirements (dict): Parsed requirements for the requested federated service.
-            - tx_hash (str): The transaction hash of the service announcement event.
-            - block_number (str): The block number where the service announcement was recorded.
-
-    Raises:
-        HTTPException:
-            - 404: If no new service announcements are found within the last 20 blocks.
-            - 500: If an error occurs while processing the request or fetching the announcements.
-    """ 
+def check_service_announcements_endpoint():
+    blocks_to_check = 20
     try:
-        blocks_to_check = 20
-        new_service_event = blockchain.create_event_filter(blockchain.FederationEvents.SERVICE_ANNOUNCEMENT, last_n_blocks=blocks_to_check)
+        new_service_event = blockchain.create_event_filter(FederationEvents.SERVICE_ANNOUNCEMENT, last_n_blocks=blocks_to_check)
         new_events = new_service_event.get_all_entries()
         open_services = []
         announcements_received = []
@@ -401,58 +200,26 @@ async def check_service_announcements_endpoint():
                 })
 
         if announcements_received:
-            return JSONResponse(content={"announcements": announcements_received})
+            return {"announcements": announcements_received}
         else:
-            raise HTTPException(status_code=404, detail="No new services announced in the last {blocks_to_check} blocks.")
+            raise HTTPException(status_code=404, detail=f"No new services announced in the last {blocks_to_check} blocks.")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.post("/place_bid", summary="Place a bid", tags=["Provider functions"])
 def place_bid_endpoint(request: PlaceBidRequest):
-    """
-    Place a bid for a service announcement.
-
-    Args:
-        request (PlaceBidRequest): A Pydantic model containing the following fields:
-            - service_id (str): The unique identifier of the service being bid on.
-            - service_price (int): The price the provider is offering for the service.
-
-    Returns:
-        JSONResponse: A JSON object containing:
-            - tx_hash (str): The transaction hash of the submitted bid.
-
-    Raises:
-        HTTPException: 
-            - 400: If the provided endpoint format is invalid.
-            - 500: If there is an internal server error during bid submission.
-    """ 
     try:
         tx_hash = blockchain.place_bid(request.service_id, request.service_price, "None", "None", "None", "None")
-        return JSONResponse(content={"tx_hash": tx_hash})
+        return {"tx_hash": tx_hash}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/bids", summary="Check bids", tags=["Consumer functions"]) 
-async def check_bids_endpoint(service_id: str = Query(..., description="The service ID to check bids for")):
-    """
-    Check for bids placed on a specific service.
-
-    Args:
-        - service_id (str): The unique identifier of the service to check for bids.
-
-    Returns:
-        dict: A JSON response containing:
-            - bid_index (str): The index of the highest bid.
-            - provider_address (str): The blockchain address of the bidding provider.
-            - service_price (str): The price offered for the service.
-
-    Raises:
-        HTTPException: If no bids are found or if there is an internal server error.
-    """    
+def check_bids_endpoint(service_id: str = Query(..., description="The service ID to check bids for")):  
+    blocks_to_check = 20
     try:
-        blocks_to_check = 20
-        bids_event = blockchain.create_event_filter(blockchain.FederationEvents.NEW_BID, last_n_blocks=blocks_to_check)
+        bids_event = blockchain.create_event_filter(FederationEvents.NEW_BID, last_n_blocks=blocks_to_check)
         new_events = bids_event.get_all_entries()
         bids_received = []
         for event in new_events:
@@ -465,57 +232,22 @@ async def check_bids_endpoint(service_id: str = Query(..., description="The serv
                     "service_price": bid_info[1]
                 })
         if bids_received:
-            return JSONResponse(content={"bids": bids_received})
+            return {"bids": bids_received}
         else:
-            raise HTTPException(status_code=404, detail="No new bids in the last {blocks_to_check} blocks.")
+            raise HTTPException(status_code=404, detail=f"No new bids in the last {blocks_to_check} blocks.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/choose_provider", summary="Choose provider", tags=["Consumer functions"])
-def choose_provider_endpoint(request: ChooseProviderRequest):
-    """
-    Choose a provider from the bids received for a federated service.
-
-    Args:
-        request (ChooseProviderRequest): A Pydantic model containing the following fields:
-            - service_id (str): The unique identifier of the service for which the provider is being selected.
-            - bid_index (int): The index of the bid representing the chosen provider.
-
-    Returns:
-        JSONResponse: A JSON object containing:
-            - tx_hash (str): The transaction hash of the sent transaction for choosing the provider.
-
-    Raises:
-        HTTPException: 
-            - 500: If there is an internal server error during the provider selection process.
-    """    
+def choose_provider_endpoint(request: ChooseProviderRequest): 
     try:
         tx_hash = blockchain.choose_provider(request.service_id, request.bid_index)
-        return JSONResponse(content={"tx_hash": tx_hash})    
+        return {"tx_hash": tx_hash}    
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/send_endpoint_info", summary="Send endpoint information for federated service deployment", tags=["General federation functions"])
 def send_endpoint_info(request: UpdateEndpointRequest):
-    """
-    
-    Args:
-        request (UpdateEndpointRequest): A Pydantic model containing the following fields:
-            - service_id (str): The unique identifier of the service.
-            - topology_db (str): URL or endpoint of the topology database.
-            - ns_id (str): Network Service ID.
-            - service_catalog_db (str, optional): URL or endpoint of the service catalog database (default: None).
-            - nsd_id (str, optional): Network Service Descriptor ID (default: None).
-
-    Returns:
-        JSONResponse: A JSON object containing:
-            - tx_hash (str): The transaction hash of the sent transaction for choosing the provider.
-
-    Raises:
-        HTTPException: 
-            - 500: If there is an internal server error during the process of sending the endpoint information.
-    """
-    global domain    
     try:            
         service_catalog_db = request.service_catalog_db if request.service_catalog_db is not None else "None"
         nsd_id = request.nsd_id if request.nsd_id is not None else "None"
@@ -523,84 +255,23 @@ def send_endpoint_info(request: UpdateEndpointRequest):
         tx_hash = blockchain.update_endpoint(request.service_id, domain,
                                  service_catalog_db, request.topology_db,
                                  nsd_id, request.ns_id)
-        return JSONResponse(content={"tx_hash": tx_hash})    
+        return {"tx_hash": tx_hash}    
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.get("/winner_status", summary="Check if a winner has been chosen", tags=["Provider functions"])
-async def check_winner_status_endpoint(service_id: str = Query(..., description="The service ID to check if there is a winner provider in the federation")):
-    """
-    Check if a winner has been chosen for a specific service in the federation.
-
-    Args:
-        - service_id (str): The unique identifier of the service for which the winner is being checked.
-
-    Returns:
-        JSONResponse: A JSON object containing:
-            - winner (str): 'yes' if a winner has been selected, otherwise 'no'.
-
-    Raises:
-        HTTPException:
-            - 500: If there is an internal server error while checking for the winner.
-    """    
-    try:
-        winner_chosen_event = blockchain.create_event_filter(blockchain.FederationEvents.SERVICE_ANNOUNCEMENT_CLOSED, last_n_blocks=20)
-        new_events = winner_chosen_event.get_all_entries()
-        for event in new_events:
-            event_service_id = Web3.toText(event['args']['_id']).rstrip('\x00')
-            if event_service_id == service_id:
-                return JSONResponse(content={"winner": "yes"})   
-        return JSONResponse(content={"winner": "no"})  
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.get("/is_winner", summary="Check if the calling provider is the winner", tags=["Provider functions"])
-async def check_if_I_am_Winner_endpoint(service_id: str = Query(..., description="The service ID to check if I am the winner provider in the federation")):
-    """
-    Check if the calling provider is the winner for a specific service.
-
-    Args:
-        - service_id (str): The unique identifier of the service for which the provider's winner status is being checked.
-
-    Returns:
-        JSONResponse: A JSON object containing:
-            - is_winner (str): 'yes' if the calling provider is the winner, otherwise 'no'.
-
-    Raises:
-        HTTPException:
-            - 500: If there is an internal server error while checking the winner status.
-    """
+def check_if_I_am_Winner_endpoint(service_id: str = Query(..., description="The service ID to check if I am the winner provider in the federation")):
     try:
-        if blockchain.check_winner(service_id):
-           return JSONResponse(content={"is_winner": "yes"})
-        else:
-           return JSONResponse(content={"is_winner": "no"})
+        return {"is_winner": "yes" if blockchain.check_winner(service_id) else "no"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/service_deployed", summary="Confirm service deployment", tags=["Provider functions"])
 def service_deployed_endpoint(request: ServiceDeployedRequest):
-    """
-    Confirm the successful deployment of a service by the provider.
-
-    Args:
-        request (ServiceDeployedRequest): The request object containing:
-            - service_id (str): The unique identifier of the deployed service.
-            - federated_host (str): The external IP address where the service is hosted.
-
-    Returns:
-        JSONResponse: A JSON object containing:
-            - tx_hash (str): The transaction hash of the confirmation sent to the blockchain.
-
-    Raises:
-        HTTPException:
-            - 404: If the calling provider is not the winner of the service.
-            - 500: If there is an internal server error during the confirmation process.
-    """   
     try:
         if blockchain.check_winner(request.service_id):
             tx_hash = blockchain.service_deployed(request.service_id, request.federated_host)
-            return JSONResponse(content={"tx_hash": tx_hash})
+            return {"tx_hash": tx_hash}
         else:
             raise HTTPException(status_code=404, detail="You are not the winner.")
     except Exception as e:
@@ -610,7 +281,6 @@ def service_deployed_endpoint(request: ServiceDeployedRequest):
 ###---###
 @app.post("/simulate_consumer_federation_process", tags=["Consumer functions"])
 def simulate_consumer_federation_process(request: ConsumerFederationProcessRequest):
-    global domain
     try:
         # List to store the timestamps of each federation step
         federation_step_times = []  
@@ -637,7 +307,7 @@ def simulate_consumer_federation_process(request: ConsumerFederationProcessReque
             logger.info(f"📢 Service announcement sent - Service ID: {service_id}")
 
             # Wait for provider bids
-            bids_event = blockchain.create_event_filter(blockchain.FederationEvents.NEW_BID)
+            bids_event = blockchain.create_event_filter(FederationEvents.NEW_BID)
             bidderArrived = False
             logger.info("⏳ Waiting for bids...")
             while not bidderArrived:
@@ -738,16 +408,13 @@ def simulate_consumer_federation_process(request: ConsumerFederationProcessReque
             if request.export_to_csv:
                 utils.create_csv_file(request.csv_path, header, data)
             
-            return JSONResponse(content=response)
+            return response
     except Exception as e:
         logger.error(f"Federation process failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))    
 
 @app.post("/simulate_provider_federation_process", tags=["Provider functions"])
 def simulate_provider_federation_process(request: ProviderFederationProcessRequest):
-    """
-    """  
-    global domain
     try:
         # List to store the timestamps of each federation step
         federation_step_times = []  
@@ -766,7 +433,7 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
             ns_id = request.ns_id if request.ns_id is not None else "None"
 
             # Wait for service announcements
-            new_service_event = blockchain.create_event_filter(blockchain.FederationEvents.SERVICE_ANNOUNCEMENT)
+            new_service_event = blockchain.create_event_filter(FederationEvents.SERVICE_ANNOUNCEMENT)
             logger.info("⏳ Waiting for federation events...")
 
             while newService == False:
@@ -818,7 +485,7 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
 
             logger.info("⏳ Waiting for a winner to be selected...")
 
-            winner_chosen_event = blockchain.create_event_filter(blockchain.FederationEvents.SERVICE_ANNOUNCEMENT_CLOSED)
+            winner_chosen_event = blockchain.create_event_filter(FederationEvents.SERVICE_ANNOUNCEMENT_CLOSED)
             winnerChosen = False
             while winnerChosen == False:
                 new_events = winner_chosen_event.get_all_entries()
@@ -848,7 +515,7 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
                     data.append(['other_provider_choosen', t_other_provider_choosen])
                     if request.export_to_csv:
                         utils.create_csv_file(domain, header, data)
-                        return JSONResponse(content={"message": f"Another provider was chosen for service ID: {service_id}."})
+                        return{"message": f"Another provider was chosen for service ID: {service_id}."}
 
                     
             # Federated service info
@@ -906,12 +573,14 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
             if request.export_to_csv:
                 utils.create_csv_file(request.csv_path, header, data)
 
-            return JSONResponse(content=response)
+            return response
         else:
             logger.error(f"Federation process failed: {str(e)}")
             raise HTTPException(status_code=500, detail="You must be provider to run this code")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))  
+    
+
 ###---###
 
 # # # @app.post("/simulate_consumer_federation_process", tags=["Consumer functions"])

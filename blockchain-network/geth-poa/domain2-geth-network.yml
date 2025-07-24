@@ -5,10 +5,10 @@ x-common-commands:
     ./start_node.sh
     "
 services:
-
   node2:
     image: blockchain-node:geth-poa
     container_name: node2
+    hostname: node2
     env_file:
       - domain2.env
     command: *node_entrypoint
@@ -16,3 +16,4 @@ services:
       - "./config:/src/"
     network_mode: host
     restart: always
+

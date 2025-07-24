@@ -3,7 +3,6 @@
 set -e
 
 ENV_FILE=".env"
-BASE_COMPOSE_TEMPLATE="local-geth-network.yml"
 CONFIG_DIR="config"
 
 if [[ ! -f "$ENV_FILE" ]]; then
@@ -26,14 +25,22 @@ cat <<EOF > "bootnode.env"
 IDENTITY=bootnode
 BOOTNODE_IP=$BOOTNODE_IP
 BOOTNODE_PORT=$BOOTNODE_PORT
-BOOTNODE_KEY=$BOOTNODE_KEY
-BOOTNODE_URL=enode://\$BOOTNODE_KEY@\$BOOTNODE_IP:\$BOOTNODE_PORT
 EOF
 
 # Loop over each node
 for (( i=1; i<=num_nodes; i++ )); do
   domain_env="domain${i}.env"
   compose_file="domain${i}-geth-network.yml"
+
+  # Extract port values for the current node
+  WS_PORT=$(grep -E "^WS_PORT_NODE_${i}=" "$ENV_FILE" | cut -d'=' -f2 | tr -d '[:space:]')
+  RPC_PORT=$(grep -E "^RPC_PORT_NODE_${i}=" "$ENV_FILE" | cut -d'=' -f2 | tr -d '[:space:]')
+  ETH_PORT=$(grep -E "^ETH_PORT_NODE_${i}=" "$ENV_FILE" | cut -d'=' -f2 | tr -d '[:space:]')
+
+  if [[ -z "$WS_PORT" || -z "$RPC_PORT" || -z "$ETH_PORT" ]]; then
+    echo "Error: Port configuration missing for node $i."
+    exit 1
+  fi
 
   echo "Generating $domain_env..."
   cat <<EOF > "$domain_env"
@@ -46,16 +53,15 @@ BOOTNODE_IP=$BOOTNODE_IP
 BOOTNODE_PORT=$BOOTNODE_PORT
 RPC_PROTOCOL=$RPC_PROTOCOL
 BOOTNODE_KEY=$BOOTNODE_KEY
-BOOTNODE_URL=enode://\$BOOTNODE_KEY@\$BOOTNODE_IP:\$BOOTNODE_PORT
+BOOTNODE_URL=enode://\${BOOTNODE_KEY}@\${BOOTNODE_IP}:\${BOOTNODE_PORT}
 EOF
 
-  # Use generic variable names in env file
+  # Add node-specific variables to env
   grep "^ETHERBASE_NODE_${i}=" "$ENV_FILE" | sed "s/ETHERBASE_NODE_${i}/ETHERBASE/" >> "$domain_env"
-  grep "^WS_PORT_NODE_${i}=" "$ENV_FILE" | sed "s/WS_PORT_NODE_${i}/WS_PORT/" >> "$domain_env"
-  grep "^RPC_PORT_NODE_${i}=" "$ENV_FILE" | sed "s/RPC_PORT_NODE_${i}/RPC_PORT/" >> "$domain_env"
-  grep "^ETH_PORT_NODE_${i}=" "$ENV_FILE" | sed "s/ETH_PORT_NODE_${i}/ETH_PORT/" >> "$domain_env"
+  echo "WS_PORT=$WS_PORT" >> "$domain_env"
+  echo "RPC_PORT=$RPC_PORT" >> "$domain_env"
+  echo "ETH_PORT=$ETH_PORT" >> "$domain_env"
   grep "^PRIVATE_KEY_NODE_${i}=" "$ENV_FILE" | sed "s/PRIVATE_KEY_NODE_${i}/PRIVATE_KEY/" >> "$domain_env"
-  grep "^WS_NODE_${i}_URL=" "$ENV_FILE" | sed "s/WS_NODE_${i}_URL/WS_NODE_URL/" >> "$domain_env"
 
   while true; do
     echo "Please enter the IP ADDRESS of domain$i:"
@@ -79,48 +85,55 @@ x-common-commands:
 services:
 EOF
 
+  # Add bootnode only for domain1
   if [[ $i -eq 1 ]]; then
     cat <<EOF >> "$compose_file"
   bootnode:
     image: blockchain-node:geth-poa
     container_name: bootnode
+    hostname: bootnode
     env_file:
       - bootnode.env
     command: *node_entrypoint
+    network_mode: host
     volumes:
       - "./$CONFIG_DIR:/src/"
-    network_mode: host
     restart: always
+
 EOF
   fi
 
-  cat <<EOF >> "$compose_file"
+  # Add node${i} service
+  echo "  node${i}:" >> "$compose_file"
+  echo "    image: blockchain-node:geth-poa" >> "$compose_file"
+  echo "    container_name: node${i}" >> "$compose_file"
+  echo "    hostname: node${i}" >> "$compose_file"
+  echo "    env_file:" >> "$compose_file"
+  echo "      - $domain_env" >> "$compose_file"
+  echo "    command: *node_entrypoint" >> "$compose_file"
+  echo "    volumes:" >> "$compose_file"
+  echo "      - \"./$CONFIG_DIR:/src/\"" >> "$compose_file"
+  if [[ $i -eq 1 ]]; then
+    echo "    depends_on:" >> "$compose_file"
+    echo "      - bootnode" >> "$compose_file"
+  fi
+  echo "    network_mode: host" >> "$compose_file"
+  echo "    restart: always" >> "$compose_file"
+  echo "" >> "$compose_file"
 
-  node${i}:
-    image: blockchain-node:geth-poa
-    container_name: node${i}
-    env_file:
-      - $domain_env
-    command: *node_entrypoint
-    volumes:
-      - "./$CONFIG_DIR:/src/"
-    network_mode: host
-    restart: always
-EOF
-
+  # Add eth-netstats only for domain1
   if [[ $i -eq 1 ]]; then
     cat <<EOF >> "$compose_file"
-
   eth-netstats:
     image: eth-netstats
     container_name: eth-netstats
+    network_mode: host
     depends_on:
       - node1
-    network_mode: host
     restart: always
 EOF
   fi
 
 done
 
-echo "Setup completed."
+echo "✅ Setup completed successfully."

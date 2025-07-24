@@ -12,15 +12,6 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 def extract_service_requirements(formatted_requirements: str) -> dict:
-    """
-    Extracts service requirements from a formatted string into a dictionary.
-
-    Args:
-        formatted_requirements (str): A string containing service requirements formatted as 'key=value; ...'.
-
-    Returns:
-        dict: A dictionary with extracted key names and their corresponding values.
-    """
     requirements_dict = {}
     
     # Split the string by ';' and process each key-value pair
@@ -45,15 +36,6 @@ def extract_service_requirements(formatted_requirements: str) -> dict:
 
 
 def extract_service_endpoint(endpoint):
-    """
-    Extracts the IP address, VXLAN ID, VXLAN port, and Docker/K8s federation net from the endpoint string.
-
-    Args:
-        endpoint (str): String containing the endpoint information in the format "ip_address=A;vxlan_id=B;vxlan_port=C;federation_net=D".
-
-    Returns:
-        tuple: A tuple containing the extracted IP address, VXLAN ID, VXLAN port, and Docker/K8s subnet.
-    """
     match = re.match(r'ip_address=(.*?);vxlan_id=(.*?);vxlan_port=(.*?);federation_net=(.*)', endpoint)
 
     if match:
@@ -128,17 +110,6 @@ def fetch_raw_yaml(url):
         print(f"Error: {e}")
 
 def create_csv_file(file_path, header, data):
-    """
-    Creates a CSV file in the specified path to store federation events.
-
-    Args:
-        file_path (str): The directory path where the CSV will be saved (e.g., 'experiments/domain2', 'results/test_run1').
-        header (list): The header row for the CSV file.
-        data (list): The data rows to be written.
-
-    Returns:
-        None
-    """
     base_dir = Path(file_path)
     base_dir.mkdir(parents=True, exist_ok=True)
 
@@ -158,15 +129,6 @@ def create_csv_file(file_path, header, data):
         writer.writerows(data)
 
 def extract_ip_from_url(url) -> str:
-    """
-    Extracts the IP address from a given URL.
-
-    Args:
-        url (str): The URL containing the IP address.
-
-    Returns:
-        str: The extracted IP address, or None if not found.
-    """
     pattern = r'http://(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+'
     match = re.match(pattern, url)
     
@@ -176,17 +138,6 @@ def extract_ip_from_url(url) -> str:
         return None
 
 def create_smaller_subnet(original_cidr, identifier, prefix_length=24) -> str:
-    """
-    Creates a smaller subnet by modifying the third octet of the original CIDR IP address.
-    
-    Args:
-        original_cidr (str): The original CIDR notation IP address.
-        identifier (str): A generic identifier to use for the third octet of the subnet.
-        prefix_length (int, optional): The prefix length for the new subnet (default is /24).
-    
-    Returns:
-        str: The new CIDR notation IP address with the specified prefix length.
-    """
     ip, _ = original_cidr.split('/')
     octets = ip.split('.')
     octets[2] = identifier  # Modify the third octet with the identifier
@@ -195,15 +146,6 @@ def create_smaller_subnet(original_cidr, identifier, prefix_length=24) -> str:
     return new_cidr
 
 def get_ip_range_from_subnet(subnet: str) -> str:
-    """
-    Takes a network subnet in CIDR notation and returns the IP range in the format "start_ip-end_ip".
-
-    Args:
-        subnet (str): The network subnet in CIDR notation (e.g., '10.0.0.0/24').
-
-    Returns:
-        str: The IP range in the format "start_ip-end_ip".
-    """
     try:
         # Parse the subnet
         network = ipaddress.ip_network(subnet)
