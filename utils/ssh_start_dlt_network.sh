@@ -1,43 +1,43 @@
 #!/bin/bash
 
 # Define the nodes with their respective IPs and usernames
-NODE_1_IP="10.5.15.55"
-NODE_1_USER="desire6g"
+DOMAIN_1_IP="10.5.15.55"
+DOMAIN_1_USER="desire6g"
 
-NODE_2_IP="10.5.99.5"
-NODE_2_USER="netcom"
+DOMAIN_2_IP="10.5.99.5"
+DOMAIN_2_USER="netcom"
 
-NODE_3_IP="10.5.99.6"
-NODE_3_USER="netcom"
+DOMAIN_3_IP="10.5.99.6"
+DOMAIN_3_USER="netcom"
 
 # Define the individual commands for each node
-NODE_1_COMMAND="cd /home/${NODE_1_USER}/adam/dlt-federation-demo/dlt-network/ && ./start_dlt_network.sh"
-NODE_2_COMMAND="cd /home/${NODE_2_USER}/dlt-federation-demo/dlt-network/ && ./join_dlt_network.sh --node node2 --validators 3"
-NODE_3_COMMAND="cd /home/${NODE_3_USER}/dlt-federation-demo/dlt-network/ && ./join_dlt_network.sh --node node3 --validators 3"
+DOMAIN_1_COMMAND="cd /home/${DOMAIN_1_USER}/adam/d6g-dlt-federation/blockchain-network/geth-poa/ && ./start_geth_net.sh --file domain1-geth-network.yml"
+DOMAIN_2_COMMAND="cd /home/${DOMAIN_2_USER}/d6g-dlt-federation/blockchain-network/geth-poa/ && ./start_geth_net.sh --file domain2-geth-network.yml"
+DOMAIN_3_COMMAND="cd /home/${DOMAIN_3_USER}/d6g-dlt-federation/blockchain-network/geth-poa/ && ./start_geth_net.sh --file domain3-geth-network.yml"
 
 # Function to execute SSH command with debug logging
 execute_ssh_command() {
-  local node_ip=$1
-  local node_user=$2
+  local domain_ip=$1
+  local domain_user=$2
   local command=$3
-  echo "Executing on ${node_user}@${node_ip}: ${command}"
-  ssh ${node_user}@${node_ip} "${command}"
+  echo "Executing on ${domain_user}@${domain_ip}: ${command}"
+  ssh ${domain_user}@${domain_ip} "${command}"
   if [ $? -ne 0 ]; then
-    echo "Error: Command failed on ${node_user}@${node_ip}"
+    echo "Error: Command failed on ${domain_user}@${domain_ip}"
   else
-    echo "Success: Command executed on ${node_user}@${node_ip}"
+    echo "Success: Command executed on ${domain_user}@${domain_ip}"
   fi
 }
 
 # Start the DLT network on the first node
-execute_ssh_command "$NODE_1_IP" "$NODE_1_USER" "$NODE_1_COMMAND"
+execute_ssh_command "$DOMAIN_1_IP" "$DOMAIN_1_USER" "$DOMAIN_1_COMMAND"
 
 sleep 5
 
 # Join the second node to the network
-execute_ssh_command "$NODE_2_IP" "$NODE_2_USER" "$NODE_2_COMMAND"
+execute_ssh_command "$DOMAIN_2_IP" "$DOMAIN_2_USER" "$DOMAIN_2_COMMAND"
 
 sleep 2
 
 # Join the third node to the network
-execute_ssh_command "$NODE_3_IP" "$NODE_3_USER" "$NODE_3_COMMAND"
+execute_ssh_command "$DOMAIN_3_IP" "$DOMAIN_3_USER" "$DOMAIN_3_COMMAND"

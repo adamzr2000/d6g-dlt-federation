@@ -1,5 +1,15 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from typing import Optional
+from enum import Enum
+from blockchain_interface import FederationEvents
+
+class SubscriptionRequest(BaseModel):
+    event_name: FederationEvents         # e.g. FederationEvents.NEW_BID
+    callback_url: HttpUrl                # where we POST notifications
+    last_n_blocks: Optional[int] = 0     # replay history on first connect
+
+class SubscriptionResponse(SubscriptionRequest):
+    subscription_id: str
 
 class TransactionReceiptResponse(BaseModel):
     blockHash: str

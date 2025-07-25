@@ -4,3 +4,5 @@ fastapi[all]
 requests 
 pyyaml
 python-dotenv
+httpx 
+fastapi-utils

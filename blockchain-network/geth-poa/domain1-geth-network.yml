@@ -1,4 +1,4 @@
-version: '3'
+# version: '3'
 x-common-commands:
   node_entrypoint: &node_entrypoint >
     bash -c "
@@ -12,7 +12,7 @@ services:
     env_file:
       - bootnode.env
     command: *node_entrypoint
-    network_mode: "host"
+    network_mode: host
     volumes:
       - "./config:/src/"
     restart: always
@@ -28,13 +28,13 @@ services:
       - "./config:/src/"
     depends_on:
       - bootnode
-    network_mode: "host"
+    network_mode: host
     restart: always
 
   eth-netstats:
     image: eth-netstats
     container_name: eth-netstats
-    network_mode: "host"
+    network_mode: host
     depends_on:
       - node1
     restart: always

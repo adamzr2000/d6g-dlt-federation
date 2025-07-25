@@ -15,7 +15,7 @@ num_nodes=$(grep -oE '^# Node [0-9]+' "$ENV_FILE" | wc -l)
 echo "Detected $num_nodes nodes from local geth network configuration."
 
 # Read global parameters
-source <(grep -v '^#' "$ENV_FILE" | grep -E '^(NETWORK_ID|WS_SECRET|ETH_NETSATS_PORT|BOOTNODE_PORT|BOOTNODE_KEY|RPC_PROTOCOL)=')
+source <(grep -v '^#' "$ENV_FILE" | grep -E '^(NETWORK_ID|WS_SECRET|ETH_NETSTATS_PORT|BOOTNODE_PORT|BOOTNODE_KEY|RPC_PROTOCOL)=')
 
 echo "Please enter the IP ADDRESS of bootnode:"
 read -r BOOTNODE_IP
@@ -47,13 +47,11 @@ for (( i=1; i<=num_nodes; i++ )); do
 IDENTITY=node${i}
 NETWORK_ID=$NETWORK_ID
 WS_SECRET=$WS_SECRET
-ETH_NETSATS_IP=$BOOTNODE_IP
-ETH_NETSATS_PORT=$ETH_NETSATS_PORT
+ETH_NETSTATS_IP=$BOOTNODE_IP
+ETH_NETSTATS_PORT=$ETH_NETSTATS_PORT
 BOOTNODE_IP=$BOOTNODE_IP
 BOOTNODE_PORT=$BOOTNODE_PORT
 RPC_PROTOCOL=$RPC_PROTOCOL
-BOOTNODE_KEY=$BOOTNODE_KEY
-BOOTNODE_URL=enode://\${BOOTNODE_KEY}@\${BOOTNODE_IP}:\${BOOTNODE_PORT}
 EOF
 
   # Add node-specific variables to env

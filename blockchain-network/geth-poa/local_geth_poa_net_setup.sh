@@ -53,8 +53,8 @@ cat << EOF > $ENV_FILE
 NETWORK_ID=$chainID
 BLOCKCHAIN_SUBNET=10.0.0.0/24
 WS_SECRET=mysecret
-ETH_NETSATS_IP=10.0.0.2
-ETH_NETSATS_PORT=3000
+ETH_NETSTATS_IP=10.0.0.2
+ETH_NETSTATS_PORT=3000
 BOOTNODE_IP=10.0.0.3
 BOOTNODE_PORT=30301
 SAVE_LOGS=$saveLogs
@@ -135,10 +135,6 @@ bootnode_key=$(bootnode -writeaddress -nodekey "$CONFIG_DIR/bootnode/boot.key")
 
 # Append bootnode URL to .env file
 cat << EOF >> $ENV_FILE
-# Bootnode configuration
-BOOTNODE_KEY=$bootnode_key
-BOOTNODE_URL=enode://\$BOOTNODE_KEY@\$BOOTNODE_IP:\$BOOTNODE_PORT
-
 # Private keys
 EOF
 
@@ -190,11 +186,12 @@ for (( i=1; i<=$numNodes; i++ )); do
       - WS_PORT=\${WS_PORT_NODE_$i}
       - RPC_PORT=\${RPC_PORT_NODE_$i}
       - ETH_PORT=\${ETH_PORT_NODE_$i}
-      - BOOTNODE_URL=\${BOOTNODE_URL}
+      - BOOTNODE_IP=\${BOOTNODE_IP}
+      - BOOTNODE_PORT=\${BOOTNODE_PORT}
       - NETWORK_ID=\${NETWORK_ID}
       - WS_SECRET=\${WS_SECRET}
-      - ETH_NETSATS_IP=\${ETH_NETSATS_IP}
-      - ETH_NETSATS_PORT=\${ETH_NETSATS_PORT}
+      - ETH_NETSTATS_IP=\${ETH_NETSTATS_IP}
+      - ETH_NETSTATS_PORT=\${ETH_NETSTATS_PORT}
       - RPC_PROTOCOL=\${RPC_PROTOCOL}
     command: *node_entrypoint
     ports:
@@ -217,10 +214,10 @@ cat << EOF >> $DOCKER_COMPOSE_FILE
     depends_on:
       - node1
     ports:
-      - "\${ETH_NETSATS_PORT}:\${ETH_NETSATS_PORT}"
+      - "\${ETH_NETSTATS_PORT}:\${ETH_NETSTATS_PORT}"
     networks:
       blockchain_network:
-        ipv4_address: \${ETH_NETSATS_IP}
+        ipv4_address: \${ETH_NETSTATS_IP}
     restart: always
 
 networks:

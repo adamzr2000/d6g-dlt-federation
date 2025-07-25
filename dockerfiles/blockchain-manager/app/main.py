@@ -1,13 +1,18 @@
 import os
 import time
 import logging
-
+import uuid
+import httpx
 from web3 import Web3
 from fastapi import FastAPI, HTTPException, Query
+from fastapi_utils.tasks import repeat_every
+from typing import List, Dict
 
 import utils
 from blockchain_interface import BlockchainInterface, FederationEvents
 from models import (
+    SubscriptionRequest, 
+    SubscriptionResponse,
     TransactionReceiptResponse,
     DomainRegistrationRequest,
     ServiceAnnouncementRequest,
@@ -18,6 +23,9 @@ from models import (
     ConsumerFederationProcessRequest,
     ProviderFederationProcessRequest,
 )
+
+# In-memory subscription store: sub_id → {'request': SubscriptionRequest, 'filter': Filter}
+subscriptions: Dict[str, Dict] = {}
 
 # Define FastAPI app and OpenAPI metadata
 tags_metadata = [
@@ -89,8 +97,60 @@ def format_service_requirements(request: ServiceAnnouncementRequest) -> str:
     # Join all fields with a semicolon separator
     return "; ".join(fields)
 
+# Background notifier using repeat_every
+@app.on_event("startup")
+@repeat_every(seconds=2)
+async def notifier_loop() -> None:
+    async with httpx.AsyncClient() as client:
+        for sub_id, info in list(subscriptions.items()):
+            req = info["request"]
+            flt = info["filter"]
+            for entry in flt.get_new_entries():
+                # Decode event arguments using Web3.toText for clean UTF-8 strings
+                decoded_args: Dict[str, str] = {}
+                for k, v in entry.get("args", {}).items():
+                    try:
+                        text = Web3.toText(v).rstrip('\x00')
+                    except (TypeError, ValueError):
+                        text = v  # fallback to raw
+                    decoded_args[k] = text
 
-# API Endpoints
+                payload = {
+                    "subscription_id": sub_id,
+                    "event": entry.get("event"),
+                    "tx_hash": entry.get("transactionHash").hex(),
+                    "block_number": entry.get("blockNumber"),
+                    "args": decoded_args
+                }
+                try:
+                    await client.post(req.callback_url, json=payload, timeout=5.0)
+                except httpx.HTTPError as e:
+                    logger.error(f"Failed to notify {req.callback_url}: {e}")
+
+# Subscription endpoints
+@app.post("/subscriptions", response_model=SubscriptionResponse, status_code=201)
+def create_subscription(req: SubscriptionRequest):
+    try:
+        # ensure valid event
+        _ = BlockchainInterface  # for type access
+        event_filter = blockchain.create_event_filter(req.event_name, last_n_blocks=req.last_n_blocks)
+    except ValueError:
+        raise HTTPException(400, f"Unknown event '{req.event_name}'")
+    sub_id = uuid.uuid4().hex
+    subscriptions[sub_id] = {"request": req, "filter": event_filter}
+    return SubscriptionResponse(subscription_id=sub_id, **req.dict())
+
+@app.get("/subscriptions", response_model=List[SubscriptionResponse])
+def list_subscriptions():
+    return [SubscriptionResponse(subscription_id=sub_id, **info["request"].dict())
+            for sub_id, info in subscriptions.items()]
+
+@app.delete("/subscriptions/{sub_id}", status_code=204)
+def delete_subscription(sub_id: str):
+    subscriptions.pop(sub_id, None)
+    return
+
+
 @app.get("/web3_info", summary="Get Web3 info", tags=["General federation functions"])
 def web3_info_endpoint():
     try:
@@ -279,8 +339,8 @@ def service_deployed_endpoint(request: ServiceDeployedRequest):
 
 
 ###---###
-@app.post("/simulate_consumer_federation_process", tags=["Consumer functions"])
-def simulate_consumer_federation_process(request: ConsumerFederationProcessRequest):
+@app.post("/start_demo_consumer", tags=["Consumer functions"])
+def start_demo_consumer(request: ConsumerFederationProcessRequest):
     try:
         # List to store the timestamps of each federation step
         federation_step_times = []  
@@ -413,8 +473,8 @@ def simulate_consumer_federation_process(request: ConsumerFederationProcessReque
         logger.error(f"Federation process failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))    
 
-@app.post("/simulate_provider_federation_process", tags=["Provider functions"])
-def simulate_provider_federation_process(request: ProviderFederationProcessRequest):
+@app.post("/start_demo_provider", tags=["Provider functions"])
+def start_demo_provider(request: ProviderFederationProcessRequest):
     try:
         # List to store the timestamps of each federation step
         federation_step_times = []  
@@ -583,8 +643,8 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
 
 ###---###
 
-# # # @app.post("/simulate_consumer_federation_process", tags=["Consumer functions"])
-# # # def simulate_consumer_federation_process(request: ConsumerFederationProcessRequest):
+# # # @app.post("/start_demo_consumer", tags=["Consumer functions"])
+# # # def start_demo_consumer(request: ConsumerFederationProcessRequest):
 # # #     """
 # # #     Simulates the consumer-side service federation process, including the following steps:
     
@@ -753,8 +813,8 @@ def simulate_provider_federation_process(request: ProviderFederationProcessReque
 # # #         logger.error(f"Federation process failed: {str(e)}")
 # # #         raise HTTPException(status_code=500, detail=str(e))    
 
-# # # @app.post("/simulate_provider_federation_process", tags=["Provider functions"])
-# # # def simulate_provider_federation_process(request: ProviderFederationProcessRequest):
+# # # @app.post("/start_demo_provider", tags=["Provider functions"])
+# # # def start_demo_provider(request: ProviderFederationProcessRequest):
 # # #     """
 # # #     Simulates the provider-side service federation process, including the following steps:
 

@@ -27,13 +27,15 @@ Run the `./build.sh` scripts for each submodule:
 | **eth-netstats**       | Lightweight Ethereum network monitoring dashboard ([details](./dockerfiles/eth-netstats/))                                                                                                                                              | ✅ Available |
 
 
+---
+
 ### Deploy the blockchain network (distributed)
 
 This setup creates a basic 3-node private Ethereum network distributed across separate SMO machines (illustrating `domain1`, `domain2`, and `domain3`).
 
 ### 🟩 `domain1` — bootstrap node
 
-`domain1` must be deployed first and is responsible for:
+*domain1* must be deployed first and is responsible for:
 
 - **Bootnode** — Acts as the entry point and discovery service, allowing other nodes to join and connect automatically.
 - **Validator node** — Participates in the consensus protocol and maintains a synchronized copy of the distributed ledger.
@@ -45,13 +47,13 @@ Each of these domains runs:
 
 - A **validator node** that connects to the network through the bootnode hosted in `domain1`.
 
-> ℹ️ Note: Before deploying make sure you update the 'IP_ADDR', 'BOOTNODE_IP', 'NETSTATS_IP' environment variables in the following files with the actual IP address of each respective SMO machine:
-- [bootnode.env](./blockchain-network/geth-poa/config/bootnode.env)
-- [domain1.env](./blockchain-network/geth-poa/config/domain1.env)
-- [domain2.env](./blockchain-network/geth-poa/config/domain2.env)
-- [domain3.env](./blockchain-network/geth-poa/config/domain3.env)
-
 ### Steps
+
+> ℹ️ Note: Before deploying make sure you update the 'IP_ADDR', 'BOOTNODE_IP', 'NETSTATS_IP' environment variables in the following files with the actual IP address of each respective SMO machine:
+- [bootnode.env](./blockchain-network/geth-poa/bootnode.env)
+- [domain1.env](./blockchain-network/geth-poa/domain1.env)
+- [domain2.env](./blockchain-network/geth-poa/domain2.env)
+- [domain3.env](./blockchain-network/geth-poa/domain3.env)
 
 1. Initialize the network on `domain1`:
 
@@ -100,6 +102,8 @@ To deploy the `Federation Smart Contract` on the blockchain network:
 
 > ℹ️ Note: The smart contract can be deployed from any participating node in the network
 
+---
+
 ### Deploy the blockchain manager
 
 ```bash
@@ -115,54 +119,50 @@ To deploy the `Federation Smart Contract` on the blockchain network:
 
 📚 FastAPI Docs: [http://localhost:8080/docs](http://localhost:8080/docs)
 
-## API endpoints
+### API endpoints
 
 ### Web3 Info
-Returns `web3_info` details; otherwise returns an error message.
-
 ```bash
-FEDERATION_ENDPOINT="localhost:8080"
-curl -X 'GET' "http://$FEDERATION_ENDPOINT/web3_info" | jq
+FED_API="localhost:8080"
+curl -X 'GET' "http://$FED_API/web3_info" | jq
 ```
+
+Returns `web3_info` details; otherwise returns an error message.
 
 ---
 
 ### Transaction Receipt
-Returns `tx-receipt` details for a specified `tx_hash`; otherwise returns an error message.
-
 ```bash
 TX_HASH="0x123…"
-curl -X GET "http://$FEDERATION_ENDPOINT/tx_receipt?tx_hash=$TX_HASH" | jq
+curl -X GET "http://$FED_API/tx_receipt?tx_hash=$TX_HASH" | jq
 ```
+
+Returns `tx-receipt` details for a specified `tx_hash`; otherwise returns an error message.
 
 ---
 
 ### Register Domain
-Returns the `tx_hash`; otherwise returns an error message.
-
 ```bash
-curl -X POST "http://$FEDERATION_ENDPOINT/register_domain" \
--H 'Content-Type: application/json' \
--d '{
-   "name": "<domain_name>"
-}' | jq
+curl -X POST "http://$FED_API/register_domain" -H 'Content-Type: application/json' -d '{"name": "<domain_name>"}' | jq
 ```
+
+Returns the `tx_hash`; otherwise returns an error message.
 
 ---
 
 ### Unregister Domain
-Returns the `tx_hash`; otherwise returns an error message.
 
 ```bash
-curl -X DELETE "http://$FEDERATION_ENDPOINT/unregister_domain" | jq
+curl -X DELETE "http://$FED_API/unregister_domain" | jq
 ```
+
+Returns the `tx_hash`; otherwise returns an error message.
 
 ---
 
 ### Create Service Announcement
-Returns the `tx_hash` and `service_id` for federation; otherwise returns an error message.
 ```bash
-curl -X POST "http://$FEDERATION_ENDPOINT/create_service_announcement" \
+curl -X POST "http://$FED_API/create_service_announcement" \
 -H 'Content-Type: application/json' \
 -d '{
    "service_type": "K8s App Deployment",
@@ -173,54 +173,53 @@ curl -X POST "http://$FEDERATION_ENDPOINT/create_service_announcement" \
 }' | jq
 ```
 
+Returns the `tx_hash` and `service_id` for federation; otherwise returns an error message.
+
 ---
 
 ### Check Service Announcements
-Returns `announcements` details; otherwise, returns an error message.
 ```bash
-curl -X GET "http://$FEDERATION_ENDPOINT/service_announcements" | jq
+curl -X GET "http://$FED_API/service_announcements" | jq
 ```
+
+Returns `announcements` details; otherwise, returns an error message.
 
 ---
 
 ### Place Bid
-Returns the `tx_hash`; otherwise returns an error message.
 ```bash
-curl -X POST "http://$FEDERATION_ENDPOINT/place_bid" \
+curl -X POST "http://$FED_API/place_bid" \
 -H 'Content-Type: application/json' \
--d '{
-   "service_id": "<id>", 
-   "service_price": 5
-}' | jq
+-d '{"service_id": "<id>", "service_price": 5}' | jq
 ```
+
+Returns the `tx_hash`; otherwise returns an error message.
 
 ---
 
 ### Check Bids
-Returns `bids` details; otherwise returns an error message.
 ```bash
-curl -X GET "http://$FEDERATION_ENDPOINT/bids?service_id=<id>" | jq
+curl -X GET "http://$FED_API/bids?service_id=<id>" | jq
 ```
+
+Returns `bids` details; otherwise returns an error message.
 
 ---
 
 ### Choose Provider
-Returns the `tx_hash`; otherwise returns an error message.
 ```bash
-curl -X POST "http://$FEDERATION_ENDPOINT/choose_provider" \
+curl -X POST "http://$FED_API/choose_provider" \
 -H 'Content-Type: application/json' \
--d '{
-   "bid_index": 0, 
-   "service_id": "<id>"
-}' | jq
+-d '{"bid_index": 0, "service_id": "<id>"}' | jq
 ``` 
+
+Returns the `tx_hash`; otherwise returns an error message.
 
 ---
 
 ### Send Endpoint Info
-Returns the `tx_hash`; otherwise returns an error message.
 ```bash
-curl -X POST "http://$FEDERATION_ENDPOINT/send_endpoint_info" \
+curl -X POST "http://$FED_API/send_endpoint_info" \
 -H 'Content-Type: application/json' \
 -d '{
    "service_id": "<id>", 
@@ -231,20 +230,22 @@ curl -X POST "http://$FEDERATION_ENDPOINT/send_endpoint_info" \
 }' | jq
 ``` 
 
+Returns the `tx_hash`; otherwise returns an error message.
+
 ---
 
 ### Check if the calling provider is the winner
-Returns the `is_winner`, which can be `yes`, or `no`; otherwise, returns an error message.
 ```bash
-curl -X GET "http://$FEDERATION_ENDPOINT/is_winner?service_id=<id>" | jq
+curl -X GET "http://$FED_API/is_winner?service_id=<id>" | jq
 ```
+
+Returns the `is_winner`, which can be `yes`, or `no`; otherwise, returns an error message.
 
 ---
 
 ### Send Endpoint Info
-Returns the `tx_hash`; otherwise returns an error message.
 ```bash
-curl -X POST "http://$FEDERATION_ENDPOINT/send_endpoint_info" \
+curl -X POST "http://$FED_API/send_endpoint_info" \
 -H 'Content-Type: application/json' \
 -d '{
    "service_id": "<id>", 
@@ -253,12 +254,13 @@ curl -X POST "http://$FEDERATION_ENDPOINT/send_endpoint_info" \
 }' | jq
 ``` 
 
+Returns the `tx_hash`; otherwise returns an error message.
+
 ---
 
 ### Confirm Service Deployment
-Returns the `tx_hash`; otherwise returns an error message.
 ```bash
-curl -X POST "http://$FEDERATION_ENDPOINT/service_deployed" \
+curl -X POST "http://$FED_API/service_deployed" \
 -H 'Content-Type: application/json' \
 -d '{
    "service_id": "<id>",
@@ -266,18 +268,60 @@ curl -X POST "http://$FEDERATION_ENDPOINT/service_deployed" \
 }' | jq
 ```
 
+Returns the `tx_hash`; otherwise returns an error message.
+
 ---
 
 ### Check Service State
-Returns the `state` of the federated service, which can be `open`,`closed`, or `deployed`; otherwise, returns an error message.
 ```bash
-curl -X GET "http://$FEDERATION_ENDPOINT/service_state?service_id=<id>" | jq
+curl -X GET "http://$FED_API/service_state?service_id=<id>" | jq
 ```
+
+Returns the `state` of the federated service, which can be `open`,`closed`, or `deployed`; otherwise, returns an error message.
 
 ---
 
 ### Check Deployed Info
-Returns the `federated_host` (IP address of the deployed service) along with either `endpoint_consumer` or `endpoint_provider` details; otherwise, returns an error message.
 ```bash
-curl -X GET "http://$FEDERATION_ENDPOINT/service_info?service_id=<id>" | jq
+curl -X GET "http://$FED_API/service_info?service_id=<id>" | jq
 ```
+
+Returns the `federated_host` (IP address of the deployed service) along with either `endpoint_consumer` or `endpoint_provider` details; otherwise, returns an error message.
+
+---
+
+### Event Subscriptions
+
+Follow these steps to receive live notifications whenever a new smart‑contract event is emitted:
+
+1. Start the callback listener
+```bash
+cd utils
+python3 callback_receiver.py
+```
+
+It consists of a simple Flask server app running on port `9000` that receives the incoming event notifications at `/callback` and print them to the console.
+
+2. Create a subscription to the event you care about and where to deliver
+```bash
+CALLBACK_URL="http://localhost:9000/callback"
+curl -X POST "http://$FED_API/subscriptions" -H "Content-Type: application/json" -d '{"event_name": "ServiceAnnouncement","callback_url": "'"$CALLBACK_URL"'"}' | jq
+```
+
+Returns your new `subscription_id`
+
+3. List all subscriptions
+```bash
+curl -X GET "http://$FED_API/subscriptions" | jq
+```
+
+Returns an array of `{ subscription_id, event_name, callback_url, last_n_blocks }`
+
+
+4. Delete a subscription
+```bash
+SUB_ID="b1dcf105e5944daea0425a7649aaee36"
+curl -X DELETE "http://$FED_API/subscriptions/$SUB_ID"
+```
+
+Returns HTTP 204 on success; the subscription is removed.

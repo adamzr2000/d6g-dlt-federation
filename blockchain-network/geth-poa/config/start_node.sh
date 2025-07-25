@@ -15,11 +15,12 @@ set -euo pipefail
 #     export ETH_PORT=<port>           # P2P port
 #     export RPC_PORT=<port>           # internal use for authrpc
 #     export ETHERBASE=<0x...>         # miner account
-#     export BOOTNODE_URL=<enode://...>
+#     export BOOTNODE_IP=<ip>
+#     export BOOTNODE_PORT=<port>
 #     export NETWORK_ID=<int>
 #     export WS_SECRET=<string>
-#     export ETH_NETSATS_IP=<ip>
-#     export ETH_NETSATS_PORT=<port>
+#     export ETH_NETSTATS_IP=<ip>
+#     export ETH_NETSTATS_PORT=<port>
 #     [optional] RPC_PROTOCOL=ws|http  # default is ws
 #     [optional] SAVE_LOGS=Y           # log to logs/nodeX.log
 #------------------------------------------------------------------------
@@ -33,7 +34,7 @@ if [[ "${IDENTITY,,}" == "bootnode" ]]; then
 fi
 
 : "${IP_ADDR:?}" "${WS_PORT:?}" "${ETH_PORT:?}" "${RPC_PORT:?}" "${ETHERBASE:?}"
-: "${BOOTNODE_URL:?}" "${NETWORK_ID:?}" "${WS_SECRET:?}" "${ETH_NETSATS_IP:?}" "${ETH_NETSATS_PORT:?}"
+: "${BOOTNODE_IP:?}" "${BOOTNODE_PORT:?}" "${NETWORK_ID:?}" "${WS_SECRET:?}" "${ETH_NETSTATS_IP:?}" "${ETH_NETSTATS_PORT:?}"
 
 RPC_PROTOCOL="${RPC_PROTOCOL:-ws}"
 DATADIR="$IDENTITY"
@@ -41,6 +42,10 @@ GENESIS_FILE="${GENESIS_FILE:-genesis.json}"
 
 echo "🔧 Initializing $DATADIR with $GENESIS_FILE"
 geth init --datadir "$DATADIR" "$GENESIS_FILE"
+
+# construct the bootnode enode URL from the key + IP/port
+BOOTNODE_ENODE_ID=$(bootnode -writeaddress -nodekey ./bootnode/boot.key)
+BOOTNODE_URL="enode://${BOOTNODE_ENODE_ID}@${BOOTNODE_IP}:${BOOTNODE_PORT}"
 
 cmd=(
   geth
@@ -59,7 +64,7 @@ cmd=(
   --mine
   --snapshot=false
   --miner.etherbase "$ETHERBASE"
-  --ethstats "$IDENTITY:$WS_SECRET@$ETH_NETSATS_IP:$ETH_NETSATS_PORT"
+  --ethstats "$IDENTITY:$WS_SECRET@$ETH_NETSTATS_IP:$ETH_NETSTATS_PORT"
 )
 
 if [[ "$RPC_PROTOCOL" == "http" ]]; then
@@ -70,7 +75,10 @@ else
   cmd+=(--ws --ws.addr "$IP_ADDR" --ws.port "$WS_PORT" --ws.api "eth,net,web3,personal,miner,admin,clique")
 fi
 
-echo "🚀 Starting node $IDENTITY (P2P: $ETH_PORT, RPC: $RPC_PROTOCOL://$IP_ADDR:$WS_PORT)"
+# echo "[INFO] Executing command: ${cmd[*]}"
+
+echo "🚀 Starting node $IDENTITY (P2P: $ETH_PORT, RPC: $RPC_PROTOCOL://$IP_ADDR:$WS_PORT, BOOTNODE: $BOOTNODE_URL)"
+
 
 if [[ "${SAVE_LOGS:-n}" =~ ^[Yy]$ ]]; then
   mkdir -p logs
