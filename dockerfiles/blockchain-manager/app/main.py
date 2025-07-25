@@ -99,7 +99,7 @@ def format_service_requirements(request: ServiceAnnouncementRequest) -> str:
 
 # Background notifier using repeat_every
 @app.on_event("startup")
-@repeat_every(seconds=2)
+@repeat_every(seconds=1)
 async def notifier_loop() -> None:
     async with httpx.AsyncClient() as client:
         for sub_id, info in list(subscriptions.items()):
