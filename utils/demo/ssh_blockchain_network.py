@@ -64,21 +64,20 @@ def main():
             cfg_params["sudo"] = {"password": sudo_pw}
         cfg = Config(overrides=cfg_params)
 
-        # Choose command based on action
+        # Select command
         if ACTION == 'start':
             cmd = f"cd {script_dir} && ./start_geth_net.sh --file {netfile}"
         else:
-            cmd = f"cd {script_dir} && ./stop_geth_net.sh --file {netfile}"
+            # wrap in bash -lc so cd builtin works under sudo
+            cmd = f'bash -lc "cd {script_dir} && ./stop_geth_net.sh --file {netfile}"'
 
         logger.info(f"[{idx}/{len(NODES)}] {ACTION.upper()} on {user}@{host}")
         conn = Connection(host=host, user=user, config=cfg)
 
         try:
             if ACTION == 'stop':
-                # Use sudo for stop
                 result = conn.sudo(cmd, warn=True, hide=False)
             else:
-                # Normal run for start
                 result = conn.run(cmd, warn=True, hide=False)
 
             if result.exited == 0:
