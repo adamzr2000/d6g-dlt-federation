@@ -8,6 +8,9 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi_utils.tasks import repeat_every
 from typing import List, Dict
 from datetime import datetime
+import sys
+import threading
+import signal
 
 import utils
 from blockchain_interface import BlockchainInterface, FederationEvents
@@ -38,6 +41,17 @@ app = FastAPI(
     version="1.0.0",
     openapi_tags=tags_metadata
 )
+
+shutdown_event = threading.Event()
+
+# Graceful shutdown handler
+def handle_sigint(sig, frame):
+    print("🔌 SIGINT received. Cleaning up...")
+    shutdown_event.set()
+    # Do custom cleanup here (close files, stop threads, etc.)
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, handle_sigint)
 
 domain           = os.getenv("DOMAIN_FUNCTION", "").strip().lower()
 eth_address      = os.getenv("ETH_ADDRESS")
@@ -382,7 +396,7 @@ def run_consumer_federation_demo():
     offers_to_wait = 1
     export_to_csv = False
     csv_path = "federation_demo_consumer.csv"
-        
+    expected_hours = 1
     process_start_time = time.time()
                 
     # Send service announcement (federation request)
@@ -433,12 +447,12 @@ def run_consumer_federation_demo():
         if lowest_price is None or bid_price < lowest_price:
             lowest_price = bid_price
             best_bid_index = bid_index
-            logger.info(f"New lowest price: {lowest_price} with bid index: {best_bid_index}")
+            # logger.info(f"New lowest price: {lowest_price} with bid index: {best_bid_index}")
                     
     # Choose winner provider
     t_winner_choosen = time.time() - process_start_time
     data.append(['winner_choosen', t_winner_choosen])
-    tx_hash = blockchain.choose_provider(service_id, best_bid_index)
+    tx_hash = blockchain.choose_provider(service_id, best_bid_index, expected_hours, expected_hours*bid_price)
     logger.info(f"🏆 Provider selected - Bid index: {best_bid_index}")
 
     logger.info("Endpoint information for application migration and inter-domain connectivity shared.")
