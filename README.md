@@ -310,3 +310,5 @@ curl -X DELETE "http://$FED_API/subscriptions/$SUB_ID"
 ```
 
 Returns HTTP 204 on success; the subscription is removed.
+
+

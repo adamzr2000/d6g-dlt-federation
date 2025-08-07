@@ -9,6 +9,8 @@ fi
 # Commit message
 COMMIT_MESSAGE="$1"
 
+git checkout main
+
 # Add all changes
 git add --all
 
@@ -16,7 +18,7 @@ git add --all
 git commit -m "$COMMIT_MESSAGE"
 
 # Push to the origin
-git push -u origin main
+git push origin main
 
 echo "Changes have been pushed to the repository."
 
