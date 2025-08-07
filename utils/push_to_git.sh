@@ -15,9 +15,6 @@ git add --all
 # Commit with the provided message
 git commit -m "$COMMIT_MESSAGE"
 
-# Set the branch to main
-git branch -M main
-
 # Push to the origin
 git push -u origin main
 

@@ -94,7 +94,7 @@ To start the local Ethereum network:
 
 ### Deploy the Federation Smart Contract
 
-To deploy the `Federation Smart Contract` on the blockchain network:
+To deploy the [Federation Smart Contract](./smart-contracts/contracts/Federation.sol) on the blockchain network:
 
 ```bash
 ./deploy_smart_contract.sh --node-ip 127.0.0.1 --port 3334
