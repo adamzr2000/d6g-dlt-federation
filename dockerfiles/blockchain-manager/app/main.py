@@ -176,7 +176,7 @@ def announce_service_endpoint(request: ServiceAnnouncementRequest):
             request.availability if request.availability is not None else 0,  
             request.max_latency_ms if request.max_latency_ms is not None else 0,  
             request.max_jitter_ms if request.max_jitter_ms is not None else 0, 
-            request.min_bandwdith_Mbps if request.min_bandwdith_Mbps is not None else 0, 
+            request.min_bandwidth_Mbps if request.min_bandwidth_Mbps is not None else 0, 
             request.compute_cpu_mcores if request.compute_cpu_mcores is not None else 0, 
             request.compute_ram_MB if request.compute_ram_MB is not None else 0
         ) 

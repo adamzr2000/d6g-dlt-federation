@@ -170,7 +170,7 @@ class BlockchainInterface:
 
         except Exception as e:
             logger.error(f"Failed to register domain: {str(e)}")
-            raise Exception("Domain registration failed.")
+            raise Exception(f"Failed to register domain: {str(e)}")
 
 
     def unregister_domain(self) -> str:
@@ -180,9 +180,9 @@ class BlockchainInterface:
 
         except Exception as e:
             logger.error(f"Failed to unregister domain: {str(e)}")
-            raise Exception("Domain unregistration failed.")
+            raise Exception(f"Failed to unregister domain: {str(e)}")
                                     
-    def announce_service(self, service_id: str, description: str, availability: int, max_latency_ms: int,
+    def announce_service(self, description: str, availability: int, max_latency_ms: int,
                          max_jitter_ms: int, min_bandwidth_mbps: int, cpu_millicores: int, ram_mb: int):
         try:
             service_id = 'service' + str(int(time.time()))
@@ -200,7 +200,7 @@ class BlockchainInterface:
             return tx_hash, service_id
         except Exception as e:
             logger.error(f"Failed to announce service: {str(e)}")
-            raise Exception("Service announcement failed.")
+            raise Exception(f"Failed to announce service: {str(e)}")
 
     def update_endpoint(self, service_id: str, is_provider: bool, catalog: str, topo: str, nsd: str, ns: str):
         try:
@@ -216,7 +216,7 @@ class BlockchainInterface:
 
         except Exception as e:
             logger.error(f"Failed to update endpoint: {str(e)}")
-            raise Exception("Service update failed.")
+            raise Exception(f"Failed to update endpoint: {str(e)}")
 
     def place_bid(self, service_id: str, price_wei_per_hour: int, location: str):
         try:
@@ -229,7 +229,7 @@ class BlockchainInterface:
 
         except Exception as e:
             logger.error(f"Failed to place bid for service_id {service_id}: {str(e)}")
-            raise Exception(f"Error occurred while placing bid for service_id {service_id}.")
+            raise Exception(f"Failed to place bid for service_id {service_id}: {str(e)}")
 
     def choose_provider(self, service_id: str, bid_index: int, expected_hours: int, payment_wei: int):
         try:
@@ -245,7 +245,7 @@ class BlockchainInterface:
 
         except Exception as e:
             logger.error(f"Failed to choose provider for service_id '{service_id}' and bid_index '{bid_index}': {str(e)}")
-            raise Exception("Error occurred while choosing the provider.")
+            raise Exception(f"Failed to choose provider for service_id '{service_id}' and bid_index '{bid_index}': {str(e)}")
 
     def service_deployed(self, service_id: str):
         try:
@@ -256,7 +256,7 @@ class BlockchainInterface:
 
         except Exception as e:
             logger.error(f"Failed to confirm deployment for service_id {service_id}: {str(e)}")
-            raise Exception(f"Failed to confirm deployment for service_id {service_id}.")
+            raise Exception(f"Failed to confirm deployment for service_id {service_id}: {str(e)}")
 
     def cancel_service(self, service_id: str):
         try:
@@ -267,7 +267,7 @@ class BlockchainInterface:
             
         except Exception as e:
             logger.error(f"Failed to cancel service_id {service_id}: {str(e)}")
-            raise Exception(f"Failed to confirm cancel service_id {service_id}.")
+            raise Exception(f"Failed to cancel service_id {service_id}: {str(e)}")
 
     def withdraw_payment(self, service_id: str):
         try:
@@ -278,35 +278,35 @@ class BlockchainInterface:
             
         except Exception as e:
             logger.error(f"Failed to withdraw payment for service_id {service_id}: {str(e)}")
-            raise Exception(f"Failed to withdraw payment for service_id {service_id}.")
+            raise Exception(f"Failed to withdraw payment for service_id {service_id}: {str(e)}")
 
     def get_service_state(self, service_id: str) -> int:  
         try:
             return self.contract.functions.getServiceState(self.web3.toBytes(text=service_id)).call()
         except Exception as e:
             logger.error(f"Failed to retrieve service state for service_id '{service_id}': {str(e)}")
-            raise Exception(f"Error occurred while retrieving the service state for service_id '{service_id}'.")
+            raise Exception(f"Failed to retrieve service state for service_id '{service_id}': {str(e)}")
 
     def get_service_requirements(self, service_id: str):
         try:            
             return self.contract.functions.getServiceRequirements(self.web3.toBytes(text=service_id)).call()
         except Exception as e:
             logger.error(f"Failed to retrieve deployed info for service_id '{service_id}': {str(e)}")
-            raise Exception(f"Error occurred while retrieving deployed info for service_id '{service_id}'.")
+            raise Exception(f"Failed to retrieve deployed info for service_id '{service_id}': {str(e)}")
         
     def is_winner(self, service_id: str) -> bool:
         try:
             return self.contract.functions.isWinner(self.web3.toBytes(text=service_id), self.eth_address).call()
         except Exception as e:
             logger.error(f"Failed to check winner for service_id '{service_id}': {str(e)}")
-            raise Exception(f"Error occurred while checking the winner for service_id '{service_id}'.")
+            raise Exception(f"Failed to check winner for service_id '{service_id}': {str(e)}")
 
     def get_bid_count(self, service_id) -> int:
         try:
-            return self.contract.functions.getBidInfo(self.web3.toBytes(text=service_id), self.eth_address).call()
+            return self.contract.functions.getBidCount(self.web3.toBytes(text=service_id), self.eth_address).call()
         except Exception as e:
             logger.error(f"Failed to retrieve bid count for service_id '{service_id}': {str(e)}")
-            raise Exception("Error occurred while retrieving bid count information.")
+            raise Exception(f"Failed to retrieve bid count for service_id '{service_id}': {str(e)}")
 
     def get_bid_info(self, service_id: str, index: int):
         try:
@@ -317,7 +317,7 @@ class BlockchainInterface:
             ).call()
         except Exception as e:
             logger.error(f"Failed to retrieve bid info for service_id '{service_id}' and bider index '{index}': {str(e)}")
-            raise Exception("Error occurred while retrieving bid information.")
+            raise Exception(f"Failed to retrieve bid info for service_id '{service_id}' and bider index '{index}': {str(e)}")
 
     def get_service_info(self, service_id: str, is_provider: bool):
         try:            
@@ -330,14 +330,14 @@ class BlockchainInterface:
             return description, catalog, topology, nsd_id, ns_id
         except Exception as e:
             logger.error(f"Failed to retrieve deployed info for service_id '{service_id}': {str(e)}")
-            raise Exception(f"Error occurred while retrieving deployed info for service_id '{service_id}'.")
+            raise Exception(f"Failed to retrieve deployed info for service_id '{service_id}': {str(e)}")
         
     def get_operator_info(self):
         try:            
             return self.contract.functions.getOperatorInfo(self.eth_address).call()
         except Exception as e:
             logger.error(f"Failed to retrieve operator info: {str(e)}")
-            raise Exception(f"Error occurred while retrieving operator info")
+            raise Exception(f"Failed to retrieve operator info: {str(e)}")
 
     def display_service_state(self, service_id: str):  
         state = self.get_service_state(service_id)
@@ -345,4 +345,4 @@ class BlockchainInterface:
         if 0 <= state < len(states):
             logger.info(f"Service state: {states[state]}")
         else:
-            logger.error(f"Unknown service state code: {state}")
+            logger.error(f"Service state: {states[state]}")

@@ -97,7 +97,7 @@ To start the local Ethereum network:
 To deploy the [Federation Smart Contract](./smart-contracts/contracts/Federation.sol) on the blockchain network:
 
 ```bash
-./deploy_smart_contract.sh --node-ip 127.0.0.1 --port 3334
+./deploy_smart_contract.sh --node-ip 10.5.15.55 --port 3334
 ```
 
 > ℹ️ Note: The smart contract can be deployed from any participating node in the network
@@ -239,7 +239,7 @@ Returns the `tx_hash`; otherwise returns an error message.
 
 ### Check if the calling provider is the winner
 ```bash
-curl -X GET "http://$FED_API/is_winner/$SERVICE_ID | jq
+curl -X GET "http://$FED_API/is_winner/$SERVICE_ID" | jq
 ```
 
 Returns the `is_winner`, which can be `yes`, or `no`; otherwise, returns an error message.

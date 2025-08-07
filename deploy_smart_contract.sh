@@ -47,7 +47,7 @@ echo " - Protocol   : $protocol"
 echo " - Network ID : $network_id"
 
 # Construct the command for the container
-START_CMD="./deploy.sh --node-ip $node_ip --port $port --protocol $protocol"
+START_CMD="./deploy.sh"
 
 docker run \
   -it \
