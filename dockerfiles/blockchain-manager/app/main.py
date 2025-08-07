@@ -445,7 +445,7 @@ def run_consumer_federation_demo():
             lowest_price = bid_price
             best_bid_index = bid_index
             # logger.info(f"New lowest price: {lowest_price} with bid index: {best_bid_index}")
-    logger.info(table)
+    print(table)
     # Choose winner provider
     t_winner_choosen = time.time() - process_start_time
     data.append(['winner_choosen', t_winner_choosen])
@@ -465,7 +465,7 @@ def run_consumer_federation_demo():
     # blockchain.display_service_state(service_id)
 
     # Federated service info
-    desc, endpoint_provider_catalog, endpoint_provider_topology, endpoint_provider_nsd_id, endpoint_provider_ns_id = blockchain.get_service_info(service_id, provider_flag)
+    # desc, endpoint_provider_catalog, endpoint_provider_topology, endpoint_provider_nsd_id, endpoint_provider_ns_id = blockchain.get_service_info(service_id, provider_flag)
     logger.info(
         "📡 Federated service info\n"
         f"{'-'*40}\n"
@@ -569,10 +569,8 @@ def run_provider_federation_demo():
         new_events = winner_chosen_event.get_all_entries()
         for event in new_events:
             event_service_id = Web3.toText(event['args']['serviceId']).rstrip('\x00')
-            print("Event service ID:", event_service_id)
             if event_service_id == service_id:    
                 # Winner choosen received
-                print("Winner chosen for service ID:", service_id)
                 t_winner_received = time.time() - process_start_time
                 data.append(['winner_received', t_winner_received])
                 winnerChosen = True
@@ -594,7 +592,7 @@ def run_provider_federation_demo():
         return {"message": f"Another provider was chosen for service ID: {service_id}."}
             
     # Federated service info
-    desc, endpoint_consumer_catalog, endpoint_consumer_topology, endpoint_consumer_nsd_id, endpoint_consumer_ns_id = blockchain.get_service_info(service_id, provider_flag)
+    # desc, endpoint_consumer_catalog, endpoint_consumer_topology, endpoint_consumer_nsd_id, endpoint_consumer_ns_id = blockchain.get_service_info(service_id, provider_flag)
 
     logger.info(
         "📡 Federated service info\n"
