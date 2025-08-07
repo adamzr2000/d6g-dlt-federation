@@ -134,7 +134,7 @@ Returns `web3_info` details; otherwise returns an error message.
 ### Transaction Receipt
 ```bash
 TX_HASH="0x123…"
-curl -X GET "http://$FED_API/tx_receipt?tx_hash=$TX_HASH" | jq
+curl -X GET "http://$FED_API/tx_receipt/$TX_HASH" | jq
 ```
 
 Returns `tx-receipt` details for a specified `tx_hash`; otherwise returns an error message.
@@ -143,7 +143,7 @@ Returns `tx-receipt` details for a specified `tx_hash`; otherwise returns an err
 
 ### Register Domain
 ```bash
-curl -X POST "http://$FED_API/register_domain" -H 'Content-Type: application/json' -d '{"name": "<domain_name>"}' | jq
+curl -X POST "http://$FED_API/register_domain/d6g-domain-1" | jq
 ```
 
 Returns the `tx_hash`; otherwise returns an error message.
@@ -162,14 +162,16 @@ Returns the `tx_hash`; otherwise returns an error message.
 
 ### Create Service Announcement
 ```bash
-curl -X POST "http://$FED_API/create_service_announcement" \
+curl -X POST "http://$FED_API/announce_service" \
 -H 'Content-Type: application/json' \
 -d '{
-   "service_type": "K8s App Deployment",
-   "bandwidth_gbps": 0.1,
-   "rtt_latency_ms": 20,
-   "compute_cpus": 2,
-   "compute_ram_gb": 4
+   "description": "K8s App Deployment",
+   "availability": 9999,
+   "max_latency_ms": 50,
+   "max_jitter_ms": 20,
+   "min_bandwidth_Mbps": 1,
+   "compute_cpu_mcores": 2000,
+   "compute_ram_MB": 4000
 }' | jq
 ```
 
@@ -190,7 +192,7 @@ Returns `announcements` details; otherwise, returns an error message.
 ```bash
 curl -X POST "http://$FED_API/place_bid" \
 -H 'Content-Type: application/json' \
--d '{"service_id": "<id>", "service_price": 5}' | jq
+-d '{"service_id": "<id>", "price_wei_hour": 10000, "location": "Madrid, Spain"}' | jq
 ```
 
 Returns the `tx_hash`; otherwise returns an error message.
@@ -199,7 +201,8 @@ Returns the `tx_hash`; otherwise returns an error message.
 
 ### Check Bids
 ```bash
-curl -X GET "http://$FED_API/bids?service_id=<id>" | jq
+SERVICE_ID="service123"
+curl -X GET "http://$FED_API/bids/$SERVICE_ID" | jq
 ```
 
 Returns `bids` details; otherwise returns an error message.
@@ -210,7 +213,7 @@ Returns `bids` details; otherwise returns an error message.
 ```bash
 curl -X POST "http://$FED_API/choose_provider" \
 -H 'Content-Type: application/json' \
--d '{"bid_index": 0, "service_id": "<id>"}' | jq
+-d '{"service_id": "<id>", "bider_index": 0, "expected_hours": 1, "payment_wei": 10000}' | jq
 ``` 
 
 Returns the `tx_hash`; otherwise returns an error message.
@@ -223,8 +226,8 @@ curl -X POST "http://$FED_API/send_endpoint_info" \
 -H 'Content-Type: application/json' \
 -d '{
    "service_id": "<id>", 
-   "service_catalog_db": "http://10.5.15.55:5000/catalog",
-   "topology_db": "http://10.5.15.55:5000/topology",
+   "catalog": "http://10.5.15.55:5000/catalog",
+   "topology": "http://10.5.15.55:5000/topology",
    "nsd_id": "ros-app.yaml",
    "ns_id": "ros-service-consumer"
 }' | jq
@@ -236,25 +239,10 @@ Returns the `tx_hash`; otherwise returns an error message.
 
 ### Check if the calling provider is the winner
 ```bash
-curl -X GET "http://$FED_API/is_winner?service_id=<id>" | jq
+curl -X GET "http://$FED_API/is_winner/$SERVICE_ID | jq
 ```
 
 Returns the `is_winner`, which can be `yes`, or `no`; otherwise, returns an error message.
-
----
-
-### Send Endpoint Info
-```bash
-curl -X POST "http://$FED_API/send_endpoint_info" \
--H 'Content-Type: application/json' \
--d '{
-   "service_id": "<id>", 
-   "topology_db": "http://10.5.15.56:5000/topology",
-   "ns_id": "ros-service-provider"
-}' | jq
-``` 
-
-Returns the `tx_hash`; otherwise returns an error message.
 
 ---
 
@@ -262,10 +250,7 @@ Returns the `tx_hash`; otherwise returns an error message.
 ```bash
 curl -X POST "http://$FED_API/service_deployed" \
 -H 'Content-Type: application/json' \
--d '{
-   "service_id": "<id>",
-   "federated_host": "10.0.0.10"
-}' | jq
+-d '{"service_id": "<id>"}' | jq
 ```
 
 Returns the `tx_hash`; otherwise returns an error message.
@@ -274,7 +259,7 @@ Returns the `tx_hash`; otherwise returns an error message.
 
 ### Check Service State
 ```bash
-curl -X GET "http://$FED_API/service_state?service_id=<id>" | jq
+curl -X GET "http://$FED_API/service_state/$SERVICE_ID" | jq
 ```
 
 Returns the `state` of the federated service, which can be `open`,`closed`, or `deployed`; otherwise, returns an error message.
@@ -283,10 +268,10 @@ Returns the `state` of the federated service, which can be `open`,`closed`, or `
 
 ### Check Deployed Info
 ```bash
-curl -X GET "http://$FED_API/service_info?service_id=<id>" | jq
+curl -X GET "http://$FED_API/service_info/$SERVICE_ID" | jq
 ```
 
-Returns the `federated_host` (IP address of the deployed service) along with either `endpoint_consumer` or `endpoint_provider` details; otherwise, returns an error message.
+Returns either `endpoint_consumer` or `endpoint_provider` details; otherwise, returns an error message.
 
 ---
 

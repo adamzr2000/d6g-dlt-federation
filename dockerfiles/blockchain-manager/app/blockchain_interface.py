@@ -3,6 +3,8 @@
 import json
 import time
 import logging
+import threading
+
 from enum import Enum
 from web3 import Web3, WebsocketProvider, HTTPProvider
 from web3.middleware import geth_poa_middleware
@@ -17,7 +19,10 @@ class FederationEvents(str, Enum):
     SERVICE_ANNOUNCEMENT = "ServiceAnnouncement"
     NEW_BID = "NewBid"
     SERVICE_ANNOUNCEMENT_CLOSED = "ServiceAnnouncementClosed"
-    SERVICE_DEPLOYED_EVENT = "ServiceDeployedEvent"
+    CONSUMER_ENDPOINT_UPDATED = "ConsumerEndpointUpdated"
+    PROVIDER_ENDPOINT_UPDATED = "ProviderEndpointUpdated"
+    SERVICE_DEPLOYED = "ServiceDeployed"
+    SERVICE_CANCELLED = "ServiceCancelled"
 
 class BlockchainInterface:
     def __init__(self, eth_address, private_key, eth_node_url, abi_path, contract_address):
@@ -45,9 +50,27 @@ class BlockchainInterface:
         logger.info(f"Web3 initialized. Address: {self.eth_address}")
         logger.info(f"Connected to Ethereum node {eth_node_url} | Version: {self.web3.clientVersion}")
 
+        # Initialize local nonce and lock
+        self._nonce_lock = threading.Lock()
+        self._local_nonce = self.web3.eth.getTransactionCount(self.eth_address)
+
+
     def send_signed_transaction(self, build_transaction):
-        nonce = self.web3.eth.getTransactionCount(self.eth_address, 'pending')
-        build_transaction['nonce'] = nonce
+        with self._nonce_lock:
+            build_transaction['nonce'] = self._local_nonce
+            self._local_nonce += 1
+
+        # Bump the gas price slightly to avoid underpriced errors
+        # If not using EIP-1559, inject legacy gasPrice
+        if 'maxFeePerGas' not in build_transaction and 'maxPriorityFeePerGas' not in build_transaction:
+            base_gas_price = self.web3.eth.gas_price
+            build_transaction['gasPrice'] = int(base_gas_price * 1.25)
+
+        # Else (EIP-1559): Optional tweak to bump the maxFeePerGas slightly
+        elif 'maxFeePerGas' in build_transaction:
+            build_transaction['maxFeePerGas'] = int(build_transaction['maxFeePerGas'] * 1.25)
+            
+        # print(f"nonce = {build_transaction['nonce']}, maxFeePerGas = {build_transaction['maxFeePerGas']}")
         signed_txn = self.web3.eth.account.signTransaction(build_transaction, self.private_key)
         tx_hash = self.web3.eth.sendRawTransaction(signed_txn.rawTransaction)
         return tx_hash.hex()
@@ -142,9 +165,9 @@ class BlockchainInterface:
         
     def register_domain(self, domain_name: str) -> str:
         try:
-            tx_data = self.contract.functions.addOperator(self.web3.toBytes(text=domain_name)).buildTransaction({'from': self.eth_address})
-            tx_hash = self.send_signed_transaction(tx_data)
-            return tx_hash
+            tx_data = self.contract.functions.addOperator(domain_name).buildTransaction({'from': self.eth_address})
+            return self.send_signed_transaction(tx_data)
+
         except Exception as e:
             logger.error(f"Failed to register domain: {str(e)}")
             raise Exception("Domain registration failed.")
@@ -153,24 +176,25 @@ class BlockchainInterface:
     def unregister_domain(self) -> str:
         try:
             tx_data = self.contract.functions.removeOperator().buildTransaction({'from': self.eth_address})
-            tx_hash = self.send_signed_transaction(tx_data)
-            return tx_hash
+            return self.send_signed_transaction(tx_data)
+
         except Exception as e:
             logger.error(f"Failed to unregister domain: {str(e)}")
             raise Exception("Domain unregistration failed.")
                                     
-    def announce_service(self, service_requirements: str,
-                        endpoint_service_catalog_db: str, endpoint_topology_db: str,
-                        endpoint_nsd_id: str, endpoint_ns_id: str):
+    def announce_service(self, service_id: str, description: str, availability: int, max_latency_ms: int,
+                         max_jitter_ms: int, min_bandwidth_mbps: int, cpu_millicores: int, ram_mb: int):
         try:
             service_id = 'service' + str(int(time.time()))
-            tx_data = self.contract.functions.AnnounceService(
-                _requirements=self.web3.toBytes(text=service_requirements),
-                _id=self.web3.toBytes(text=service_id),
-                endpoint_service_catalog_db=self.web3.toBytes(text=endpoint_service_catalog_db),
-                endpoint_topology_db=self.web3.toBytes(text=endpoint_topology_db),
-                endpoint_nsd_id=self.web3.toBytes(text=endpoint_nsd_id),
-                endpoint_ns_id=self.web3.toBytes(text=endpoint_ns_id)
+            tx_data = self.contract.functions.announceService(
+                self.web3.toBytes(text=service_id),
+                description,
+                availability,
+                max_latency_ms,
+                max_jitter_ms,
+                min_bandwidth_mbps,
+                cpu_millicores,
+                ram_mb
             ).buildTransaction({'from': self.eth_address})
             tx_hash = self.send_signed_transaction(tx_data)
             return tx_hash, service_id
@@ -178,129 +202,147 @@ class BlockchainInterface:
             logger.error(f"Failed to announce service: {str(e)}")
             raise Exception("Service announcement failed.")
 
-    def update_endpoint(self, service_id: str, domain: str, 
-                    endpoint_service_catalog_db: str, endpoint_topology_db: str,
-                    endpoint_nsd_id: str, endpoint_ns_id: str) -> str:
+    def update_endpoint(self, service_id: str, is_provider: bool, catalog: str, topo: str, nsd: str, ns: str):
         try:
-            provider_flag = (domain == "provider")
-            tx_data = self.contract.functions.UpdateEndpoint(
-                provider=provider_flag, 
-                _id=self.web3.toBytes(text=service_id),
-                endpoint_service_catalog_db=self.web3.toBytes(text=endpoint_service_catalog_db),
-                endpoint_topology_db=self.web3.toBytes(text=endpoint_topology_db),
-                endpoint_nsd_id=self.web3.toBytes(text=endpoint_nsd_id),
-                endpoint_ns_id=self.web3.toBytes(text=endpoint_ns_id)
+            tx_data = self.contract.functions.updateEndpoint(
+                is_provider,
+                self.web3.toBytes(text=service_id),
+                catalog,
+                topo,
+                nsd,
+                ns
             ).buildTransaction({'from': self.eth_address})
-            tx_hash = self.send_signed_transaction(tx_data)
-            return tx_hash
+            return self.send_signed_transaction(tx_data)
+
         except Exception as e:
             logger.error(f"Failed to update endpoint: {str(e)}")
             raise Exception("Service update failed.")
 
-    def get_bid_info(self, service_id: str, bid_index: int) -> tuple:
+    def place_bid(self, service_id: str, price_wei_per_hour: int, location: str):
         try:
-            bid_info = self.contract.functions.GetBid(
-                _id=self.web3.toBytes(text=service_id),
-                bider_index=bid_index,
-                _creator=self.eth_address
-            ).call()
-            return bid_info
-        except Exception as e:
-            logger.error(f"Failed to retrieve bid info for service_id '{service_id}' and bid_index '{bid_index}': {str(e)}")
-            raise Exception("Error occurred while retrieving bid information.")
-
-    def choose_provider(self, service_id: str, bid_index: int) -> str:
-        try:
-            tx_data = self.contract.functions.ChooseProvider(
-                _id=self.web3.toBytes(text=service_id),
-                bider_index=bid_index
+            tx_data = self.contract.functions.placeBid(
+                self.web3.toBytes(text=service_id),
+                price_wei_per_hour,
+                location
             ).buildTransaction({'from': self.eth_address})
-            tx_hash = self.send_signed_transaction(tx_data)
-            return tx_hash
-        except Exception as e:
-            logger.error(f"Failed to choose provider for service_id '{service_id}' and bid_index '{bid_index}': {str(e)}")
-            raise Exception("Error occurred while choosing the provider.")
-
-    def get_service_state(self, service_id: str) -> int:  
-        try:
-            service_state = self.contract.functions.GetServiceState(_id=self.web3.toBytes(text=service_id)).call()
-            return service_state
-        except Exception as e:
-            logger.error(f"Failed to retrieve service state for service_id '{service_id}': {str(e)}")
-            raise Exception(f"Error occurred while retrieving the service state for service_id '{service_id}'.")
-
-    def get_service_info(self, service_id: str, domain: str) -> tuple:
-        try:
-            service_id_bytes = self.web3.toBytes(text=service_id)
-            provider_flag = (domain == "provider")
-            
-            service_id, federated_host, endpoint_service_catalog_db, endpoint_topology_db, endpoint_nsd_id, endpoint_ns_id = self.contract.functions.GetServiceInfo(
-                _id=service_id_bytes, provider=provider_flag, call_address=self.eth_address).call()
-
-            return (
-                federated_host.rstrip(b'\x00').decode('utf-8'),
-                endpoint_service_catalog_db.rstrip(b'\x00').decode('utf-8'),
-                endpoint_topology_db.rstrip(b'\x00').decode('utf-8'),
-                endpoint_nsd_id.rstrip(b'\x00').decode('utf-8'),
-                endpoint_ns_id.rstrip(b'\x00').decode('utf-8')
-            )
-        except Exception as e:
-            logger.error(f"Failed to retrieve deployed info for service_id '{service_id}' and domain '{domain}': {str(e)}")
-            raise Exception(f"Error occurred while retrieving deployed info for service_id '{service_id}' and domain '{domain}'.")
-
-    def place_bid(self, service_id: str, service_price: int,
-                endpoint_service_catalog_db: str, endpoint_topology_db: str,
-                endpoint_nsd_id: str, endpoint_ns_id: str) -> str:
-        try:
-            tx_data = self.contract.functions.PlaceBid(
-                _id=self.web3.toBytes(text=service_id),
-                _price=service_price,
-                endpoint_service_catalog_db=self.web3.toBytes(text=endpoint_service_catalog_db),
-                endpoint_topology_db=self.web3.toBytes(text=endpoint_topology_db),
-                endpoint_nsd_id=self.web3.toBytes(text=endpoint_nsd_id),
-                endpoint_ns_id=self.web3.toBytes(text=endpoint_ns_id)
-            ).buildTransaction({'from': self.eth_address})
-            tx_hash = self.send_signed_transaction(tx_data)
-            return tx_hash
+            return self.send_signed_transaction(tx_data)
 
         except Exception as e:
             logger.error(f"Failed to place bid for service_id {service_id}: {str(e)}")
             raise Exception(f"Error occurred while placing bid for service_id {service_id}.")
 
-    def check_winner(self, service_id: str) -> bool:
+    def choose_provider(self, service_id: str, bid_index: int, expected_hours: int, payment_wei: int):
         try:
-            state = self.get_service_state(service_id)
-            if state == 1:
-                result = self.contract.functions.isWinner(
-                    _id=self.web3.toBytes(text=service_id), 
-                    _winner=self.eth_address
-                ).call()
-                return result
-            else:
-                return False
-        except Exception as e:
-            logger.error(f"Failed to check winner for service_id '{service_id}': {str(e)}")
-            raise Exception(f"Error occurred while checking the winner for service_id '{service_id}'.")
+            tx_data = self.contract.functions.chooseProvider(
+                self.web3.toBytes(text=service_id),
+                bid_index,
+                expected_hours
+            ).buildTransaction({
+                'from': self.eth_address,
+                'value': payment_wei
+            })
+            return self.send_signed_transaction(tx_data)
 
-    def service_deployed(self, service_id: str, federated_host: str) -> str:
+        except Exception as e:
+            logger.error(f"Failed to choose provider for service_id '{service_id}' and bid_index '{bid_index}': {str(e)}")
+            raise Exception("Error occurred while choosing the provider.")
+
+    def service_deployed(self, service_id: str):
         try:
-            tx_data = self.contract.functions.ServiceDeployed(
-                info=self.web3.toBytes(text=federated_host),
-                _id=self.web3.toBytes(text=service_id)
+            tx_data = self.contract.functions.serviceDeployed(
+                self.web3.toBytes(text=service_id)
             ).buildTransaction({'from': self.eth_address})
-            tx_hash = self.send_signed_transaction(tx_data)
-            return tx_hash
+            return self.send_signed_transaction(tx_data)
+
         except Exception as e:
             logger.error(f"Failed to confirm deployment for service_id {service_id}: {str(e)}")
             raise Exception(f"Failed to confirm deployment for service_id {service_id}.")
 
+    def cancel_service(self, service_id: str):
+        try:
+            tx_data = self.contract.functions.cancelService(
+                self.web3.toBytes(text=service_id)
+            ).buildTransaction({'from': self.eth_address})
+            return self.send_signed_transaction(tx_data)
+            
+        except Exception as e:
+            logger.error(f"Failed to cancel service_id {service_id}: {str(e)}")
+            raise Exception(f"Failed to confirm cancel service_id {service_id}.")
+
+    def withdraw_payment(self, service_id: str):
+        try:
+            tx_data = self.contract.functions.withdrawPayment(
+                self.web3.toBytes(text=service_id)
+            ).buildTransaction({'from': self.eth_address})
+            return self.send_signed_transaction(tx_data)
+            
+        except Exception as e:
+            logger.error(f"Failed to withdraw payment for service_id {service_id}: {str(e)}")
+            raise Exception(f"Failed to withdraw payment for service_id {service_id}.")
+
+    def get_service_state(self, service_id: str) -> int:  
+        try:
+            return self.contract.functions.getServiceState(self.web3.toBytes(text=service_id)).call()
+        except Exception as e:
+            logger.error(f"Failed to retrieve service state for service_id '{service_id}': {str(e)}")
+            raise Exception(f"Error occurred while retrieving the service state for service_id '{service_id}'.")
+
+    def get_service_requirements(self, service_id: str):
+        try:            
+            return self.contract.functions.getServiceRequirements(self.web3.toBytes(text=service_id)).call()
+        except Exception as e:
+            logger.error(f"Failed to retrieve deployed info for service_id '{service_id}': {str(e)}")
+            raise Exception(f"Error occurred while retrieving deployed info for service_id '{service_id}'.")
+        
+    def is_winner(self, service_id: str) -> bool:
+        try:
+            return self.contract.functions.isWinner(self.web3.toBytes(text=service_id), self.eth_address).call()
+        except Exception as e:
+            logger.error(f"Failed to check winner for service_id '{service_id}': {str(e)}")
+            raise Exception(f"Error occurred while checking the winner for service_id '{service_id}'.")
+
+    def get_bid_count(self, service_id) -> int:
+        try:
+            return self.contract.functions.getBidInfo(self.web3.toBytes(text=service_id), self.eth_address).call()
+        except Exception as e:
+            logger.error(f"Failed to retrieve bid count for service_id '{service_id}': {str(e)}")
+            raise Exception("Error occurred while retrieving bid count information.")
+
+    def get_bid_info(self, service_id: str, index: int):
+        try:
+            return self.contract.functions.getBidInfo(
+                self.web3.toBytes(text=service_id),
+                index,
+                self.eth_address
+            ).call()
+        except Exception as e:
+            logger.error(f"Failed to retrieve bid info for service_id '{service_id}' and bider index '{index}': {str(e)}")
+            raise Exception("Error occurred while retrieving bid information.")
+
+    def get_service_info(self, service_id: str, is_provider: bool):
+        try:            
+            service_id, description, catalog, topology, nsd_id, ns_id = self.contract.functions.getServiceInfo(
+                self.web3.toBytes(text=service_id),
+                is_provider,
+                self.eth_address
+            ).call()
+
+            return description, catalog, topology, nsd_id, ns_id
+        except Exception as e:
+            logger.error(f"Failed to retrieve deployed info for service_id '{service_id}': {str(e)}")
+            raise Exception(f"Error occurred while retrieving deployed info for service_id '{service_id}'.")
+        
+    def get_operator_info(self):
+        try:            
+            return self.contract.functions.getOperatorInfo(self.eth_address).call()
+        except Exception as e:
+            logger.error(f"Failed to retrieve operator info: {str(e)}")
+            raise Exception(f"Error occurred while retrieving operator info")
+
     def display_service_state(self, service_id: str):  
-        current_service_state = self.get_service_state(service_id)
-        if current_service_state == 0:
-            logger.info("Service state: Open")
-        elif current_service_state == 1:
-            logger.info("Service state: Closed")
-        elif current_service_state == 2:
-            logger.info("Service state: Deployed")
+        state = self.get_service_state(service_id)
+        states = ["Open", "Closed", "Deployed"]
+        if 0 <= state < len(states):
+            logger.info(f"Service state: {states[state]}")
         else:
-            logger.error(f"Error: state for service '{service_id}' is '{current_service_state}'")
+            logger.error(f"Unknown service state code: {state}")
