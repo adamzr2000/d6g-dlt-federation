@@ -6,6 +6,8 @@ import httpx
 from web3 import Web3
 from fastapi import FastAPI, HTTPException, Query
 from fastapi_utils.tasks import repeat_every
+from prettytable import PrettyTable
+
 from typing import List, Dict
 from datetime import datetime
 import sys
@@ -427,6 +429,9 @@ def run_consumer_federation_demo():
     lowest_price = None
     best_bid_index = None
 
+    table = PrettyTable()
+    table.field_names = ["Bid Index", "Provider Address", "Price (Wei/hour)", "Location"]
+
     # Loop through all bid indices and print their information
     for i in range(received_bids):
         bid_info = blockchain.get_bid_info(service_id, i)
@@ -434,21 +439,13 @@ def run_consumer_federation_demo():
         bid_price = int(bid_info[1])
         bid_index = int(bid_info[2])
         location = bid_info[3]
-
-        print(
-            f"{'-'*40}\n"
-            f"Bid index     : {bid_index}\n"
-            f"Provider addr : {provider_addr}\n"
-            f"Bid price     : {bid_price} Wei/hour\n",
-            f"Location      : {location}\n"
-            f"{'-'*40}"
-        )
+        table.add_row([bid_index, provider_addr, bid_price, location])
 
         if lowest_price is None or bid_price < lowest_price:
             lowest_price = bid_price
             best_bid_index = bid_index
             # logger.info(f"New lowest price: {lowest_price} with bid index: {best_bid_index}")
-                    
+    logger.info(table)
     # Choose winner provider
     t_winner_choosen = time.time() - process_start_time
     data.append(['winner_choosen', t_winner_choosen])
@@ -569,9 +566,10 @@ def run_provider_federation_demo():
         new_events = winner_chosen_event.get_all_entries()
         for event in new_events:
             event_service_id = Web3.toText(event['args']['serviceId']).rstrip('\x00')
-            
+            print("Event service ID:", event_service_id)
             if event_service_id == service_id:    
                 # Winner choosen received
+                print("Winner chosen for service ID:", service_id)
                 t_winner_received = time.time() - process_start_time
                 data.append(['winner_received', t_winner_received])
                 winnerChosen = True
