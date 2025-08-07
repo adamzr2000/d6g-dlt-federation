@@ -119,6 +119,14 @@ To deploy the [Federation Smart Contract](./smart-contracts/contracts/Federation
 
 📚 FastAPI Docs: [http://localhost:8080/docs](http://localhost:8080/docs)
 
+```bash
+# Domain1
+curl -X POST "http://$FED_API/start_demo_consumer" | jq
+
+# Domain2
+curl -X POST "http://$FED_API/start_demo_provider" | jq
+```
+
 ### API endpoints
 
 ### Web3 Info
