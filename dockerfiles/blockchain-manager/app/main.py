@@ -529,20 +529,23 @@ def run_provider_federation_demo():
                 requirements = blockchain.get_service_requirements(service_id) 
                 open_services.append(service_id)
 
-                logger.info(
-                    "📨 New service announcement:\n"
-                    f"{'-'*40}\n"
-                    f"{'Service ID':<22}: {service_id}\n"
-                    f"{'Description':<22}: {description}\n"
-                    f"{'Requirements':<22}:\n"
-                    f"  └ Availability        : {requirements[0]}\n"
-                    f"  └ Max Latency (ms)    : {requirements[1]}\n"
-                    f"  └ Max Jitter (ms)     : {requirements[2]}\n"
-                    f"  └ Min Bandwidth (Mbps): {requirements[3]}\n"
-                    f"  └ CPU (millicores)    : {requirements[4]}\n"
-                    f"  └ RAM (MB)            : {requirements[5]}\n"
-                    f"{'-'*40}"
-                )
+                # Format and display the service announcement using a table
+                table = PrettyTable()
+                table.title = "📨 New Service Announcement"
+                table.field_names = ["Field", "Value"]
+                table.align["Field"] = "l"
+                table.align["Value"] = "l"
+
+                table.add_row(["Service ID", service_id])
+                table.add_row(["Description", description])
+                table.add_row(["Availability", requirements[0]])
+                table.add_row(["Max Latency (ms)", requirements[1]])
+                table.add_row(["Max Jitter (ms)", requirements[2]])
+                table.add_row(["Min Bandwidth (Mbps)", requirements[3]])
+                table.add_row(["CPU (millicores)", requirements[4]])
+                table.add_row(["RAM (MB)", requirements[5]])
+
+                print(table)
 
         if len(open_services) > 0:
             # Announcement received
@@ -576,7 +579,7 @@ def run_provider_federation_demo():
                 break
     
     # Check if this provider is the winner
-    if blockchain.check_winner(service_id):
+    if blockchain.is_winner(service_id):
         logger.info(f"🏆 Selected as the winner for service ID: {service_id}.")
         t_deployment_start = time.time() - process_start_time
         data.append(['deployment_start', t_deployment_start])
