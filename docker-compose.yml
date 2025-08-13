@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  blockchain-manager:
+    build:
+      context: ./dockerfiles/blockchain-manager
+    image: blockchain-manager:latest
+
+  blockchain-node:
+    build:
+      context: ./dockerfiles/blockchain-node
+    image: blockchain-node:geth-poa
+
+  eth-netstats:
+    build:
+      context: ./dockerfiles/eth-netstats
+    image: eth-netstats:latest
+
+  truffle:
+    build:
+      context: ./dockerfiles/truffle
+    image: truffle:latest

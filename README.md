@@ -10,14 +10,11 @@ This repository contains the source code for the **DLT-based Federation** module
 
 ### Build the images
 
-To build the required Docker images, navigate to the [dockerfiles](./dockerfiles) directory:
-
+From the repository root:
 ```bash
-git clone git@github.com:adamzr2000/d6g-dlt-federation.git
-cd d6g-dlt-federation/dockerfiles
+docker compose build
 ```
-
-Run the `./build.sh` scripts for each submodule:
+This will build all images defined in [docker-compose.yml](./docker-compose.yml) using the Dockerfiles under [dockerfiles](./dockerfiles)
 
 | Module                 | Description                                                                                                     | Status       |
 |------------------------|-----------------------------------------------------------------------------------------------------------------|--------------|

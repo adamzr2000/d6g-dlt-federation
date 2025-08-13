@@ -60,4 +60,4 @@ docker run \
   -e PROTOCOL="$protocol" \
   -e NETWORK_ID="$network_id" \
   truffle:latest \
-  bash -c "cd /smart-contracts && $START_CMD"
+  sh -c "cd /smart-contracts && $START_CMD"
