@@ -6,6 +6,7 @@ port="8000"
 container_name="blockchain-manager"
 config=""
 domain_function=""
+jsonrpc_port="8545"
 
 usage() {
   cat <<EOF
@@ -87,11 +88,10 @@ set +o allexport
 : "${PRIVATE_KEY:?Missing PRIVATE_KEY in $config}"
 : "${JSONRPC_TRANSPORT:?Missing JSONRPC_TRANSPORT in $config}"
 : "${NAT_EXTIP:?Missing NAT_EXTIP in $config}"
-: "${JSONRPC_PORT:?Missing JSONRPC_PORT in $config}"
 : "${CONTRACT_ADDRESS:?Missing CONTRACT_ADDRESS in smart-contract.env}"
 
 # Build the Web3 node URL
-eth_node_url="${JSONRPC_TRANSPORT}://${NAT_EXTIP}:${JSONRPC_PORT}"
+eth_node_url="${JSONRPC_TRANSPORT}://${NAT_EXTIP}:$jsonrpc_port"
 
 cat <<INFO
 Launching '$container_name':

@@ -91,7 +91,7 @@ def main():
 
         # Sleep before next node
         if idx < len(NODES):
-            time.sleep(3)
+            time.sleep(5)
 
 if __name__ == "__main__":
     try:
