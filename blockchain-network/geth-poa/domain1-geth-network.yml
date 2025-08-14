@@ -12,7 +12,8 @@ services:
     env_file:
       - bootnode.env
     command: *node_entrypoint
-    network_mode: host
+    ports:
+      - "30301:30301" # DISC_PORT
     volumes:
       - "./config:/src/"
     restart: always
@@ -28,13 +29,16 @@ services:
       - "./config:/src/"
     depends_on:
       - bootnode
-    network_mode: host
+    ports:
+      - "8545:8545"
+      - "30303:30303"
     restart: always
 
   eth-netstats:
     image: eth-netstats
     container_name: eth-netstats
-    network_mode: host
+    ports:
+      - "3000:3000"
     depends_on:
       - node1
     restart: always

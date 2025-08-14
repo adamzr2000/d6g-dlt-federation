@@ -14,6 +14,8 @@ services:
     command: *node_entrypoint
     volumes:
       - "./config:/src/"
-    network_mode: host
+    ports:
+      - "8545:8545"
+      - "30303:30303"
     restart: always
 

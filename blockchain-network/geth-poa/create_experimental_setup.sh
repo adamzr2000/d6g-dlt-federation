@@ -15,7 +15,7 @@ num_nodes=$(grep -oE '^# Node [0-9]+' "$ENV_FILE" | wc -l)
 echo "Detected $num_nodes nodes from local geth network configuration."
 
 # Read global parameters
-source <(grep -v '^#' "$ENV_FILE" | grep -E '^(NETWORK_ID|WS_SECRET|ETH_NETSTATS_PORT|BOOTNODE_PORT|BOOTNODE_KEY|RPC_PROTOCOL)=')
+source <(grep -v '^#' "$ENV_FILE" | grep -E '^(NETWORK_ID|ETH_NETSTATS_SECRET|ETH_NETSTATS_PORT|BOOTNODE_PORT|BOOTNODE_KEY|JSONRPC_TRANSPORT)=')
 
 echo "Please enter the IP ADDRESS of bootnode:"
 read -r BOOTNODE_IP
@@ -23,7 +23,7 @@ read -r BOOTNODE_IP
 # Generate bootnode.env
 cat <<EOF > "bootnode.env"
 IDENTITY=bootnode
-BOOTNODE_IP=$BOOTNODE_IP
+BOOTNODE_IP=0.0.0.0
 BOOTNODE_PORT=$BOOTNODE_PORT
 EOF
 
@@ -32,45 +32,21 @@ for (( i=1; i<=num_nodes; i++ )); do
   domain_env="domain${i}.env"
   compose_file="domain${i}-geth-network.yml"
 
-  # Extract port values for the current node
-  WS_PORT=$(grep -E "^WS_PORT_NODE_${i}=" "$ENV_FILE" | cut -d'=' -f2 | tr -d '[:space:]')
-  RPC_PORT=$(grep -E "^RPC_PORT_NODE_${i}=" "$ENV_FILE" | cut -d'=' -f2 | tr -d '[:space:]')
-  ETH_PORT=$(grep -E "^ETH_PORT_NODE_${i}=" "$ENV_FILE" | cut -d'=' -f2 | tr -d '[:space:]')
-
-  if [[ -z "$WS_PORT" || -z "$RPC_PORT" || -z "$ETH_PORT" ]]; then
-    echo "Error: Port configuration missing for node $i."
-    exit 1
-  fi
-
   echo "Generating $domain_env..."
   cat <<EOF > "$domain_env"
 IDENTITY=node${i}
 NETWORK_ID=$NETWORK_ID
-WS_SECRET=$WS_SECRET
+ETH_NETSTATS_SECRET=$ETH_NETSTATS_SECRET
 ETH_NETSTATS_IP=$BOOTNODE_IP
 ETH_NETSTATS_PORT=$ETH_NETSTATS_PORT
 BOOTNODE_IP=$BOOTNODE_IP
 BOOTNODE_PORT=$BOOTNODE_PORT
-RPC_PROTOCOL=$RPC_PROTOCOL
+JSONRPC_TRANSPORT=$JSONRPC_TRANSPORT
 EOF
 
   # Add node-specific variables to env
   grep "^ETHERBASE_NODE_${i}=" "$ENV_FILE" | sed "s/ETHERBASE_NODE_${i}/ETHERBASE/" >> "$domain_env"
-  echo "WS_PORT=$WS_PORT" >> "$domain_env"
-  echo "RPC_PORT=$RPC_PORT" >> "$domain_env"
-  echo "ETH_PORT=$ETH_PORT" >> "$domain_env"
   grep "^PRIVATE_KEY_NODE_${i}=" "$ENV_FILE" | sed "s/PRIVATE_KEY_NODE_${i}/PRIVATE_KEY/" >> "$domain_env"
-
-  while true; do
-    echo "Please enter the IP ADDRESS of domain$i:"
-    read -r IP_ADDR
-    if [[ $IP_ADDR =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      echo "IP_ADDR=$IP_ADDR" >> "$domain_env"
-      break
-    else
-      echo "Invalid IP address format. Try again."
-    fi
-  done
 
   echo "Generating $compose_file..."
   cat <<EOF > "$compose_file"
@@ -93,7 +69,8 @@ EOF
     env_file:
       - bootnode.env
     command: *node_entrypoint
-    network_mode: host
+    ports:
+      - "${BOOTNODE_PORT}:${BOOTNODE_PORT}" # DISC_PORT
     volumes:
       - "./$CONFIG_DIR:/src/"
     restart: always
@@ -115,7 +92,9 @@ EOF
     echo "    depends_on:" >> "$compose_file"
     echo "      - bootnode" >> "$compose_file"
   fi
-  echo "    network_mode: host" >> "$compose_file"
+  echo "    ports:" >> "$compose_file"
+  echo "      - \"8545:8545\"" >> "$compose_file"    # JSRONRPC_PORT
+  echo "      - \"30303:30303\"" >> "$compose_file"  # P2P_PORT and DISC_PORT
   echo "    restart: always" >> "$compose_file"
   echo "" >> "$compose_file"
 
@@ -125,7 +104,8 @@ EOF
   eth-netstats:
     image: eth-netstats
     container_name: eth-netstats
-    network_mode: host
+    ports:
+      - "${ETH_NETSTATS_PORT}:${ETH_NETSTATS_PORT}"
     depends_on:
       - node1
     restart: always

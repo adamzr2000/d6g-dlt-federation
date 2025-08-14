@@ -52,13 +52,13 @@ cat << EOF > $ENV_FILE
 # Global configuration
 NETWORK_ID=$chainID
 BLOCKCHAIN_SUBNET=10.0.0.0/24
-WS_SECRET=mysecret
+ETH_NETSTATS_SECRET=mysecret
 ETH_NETSTATS_IP=10.0.0.2
 ETH_NETSTATS_PORT=3000
 BOOTNODE_IP=10.0.0.3
 BOOTNODE_PORT=30301
 SAVE_LOGS=$saveLogs
-RPC_PROTOCOL=ws
+JSONRPC_TRANSPORT=ws
 EOF
 
 # Generate node addresses and update the .env file
@@ -78,10 +78,6 @@ for (( i=1; i<=$numNodes; i++ )); do
 # Node $i configuration
 ETHERBASE_NODE_$i=$addr
 IP_NODE_$i=10.0.0.$((3 + $i))
-WS_PORT_NODE_$i=$((3333 + $i))
-RPC_PORT_NODE_$i=$((8550 + $i))
-ETH_PORT_NODE_$i=$((30302 + $i))
-WS_NODE_${i}_URL=ws://\${IP_NODE_$i}:\${WS_PORT_NODE_$i}
 EOF
 
   # Append address to extraData and alloc sections
@@ -161,6 +157,8 @@ services:
       - BOOTNODE_IP=\${BOOTNODE_IP}
       - BOOTNODE_PORT=\${BOOTNODE_PORT}
     command: *node_entrypoint
+    ports:
+      - "\${BOOTNODE_PORT}:\${BOOTNODE_PORT}" # DISC_PORT
     volumes:
       - "./$CONFIG_DIR:/src/"    
     networks:
@@ -182,20 +180,17 @@ for (( i=1; i<=$numNodes; i++ )); do
     environment:
       - IDENTITY=node$i
       - ETHERBASE=\${ETHERBASE_NODE_$i}
-      - IP_ADDR=\${IP_NODE_$i}
-      - WS_PORT=\${WS_PORT_NODE_$i}
-      - RPC_PORT=\${RPC_PORT_NODE_$i}
-      - ETH_PORT=\${ETH_PORT_NODE_$i}
+      - JSONRPC_TRANSPORT=\${JSONRPC_TRANSPORT}
       - BOOTNODE_IP=\${BOOTNODE_IP}
       - BOOTNODE_PORT=\${BOOTNODE_PORT}
       - NETWORK_ID=\${NETWORK_ID}
-      - WS_SECRET=\${WS_SECRET}
+      - ETH_NETSTATS_SECRET=\${ETH_NETSTATS_SECRET}
       - ETH_NETSTATS_IP=\${ETH_NETSTATS_IP}
       - ETH_NETSTATS_PORT=\${ETH_NETSTATS_PORT}
-      - RPC_PROTOCOL=\${RPC_PROTOCOL}
     command: *node_entrypoint
     ports:
-      - "\${WS_PORT_NODE_$i}:\${WS_PORT_NODE_$i}"
+      - "$((8544 + $i)):8545"      # JSRONRPC_PORT
+      - "$((30302 + $i)):30303"    # P2P_PORT and DISC_PORT
     volumes:
       - "./$CONFIG_DIR:/src/"
     networks:
