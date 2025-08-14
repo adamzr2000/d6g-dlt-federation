@@ -25,6 +25,7 @@ cat <<EOF > "bootnode.env"
 IDENTITY=bootnode
 BOOTNODE_IP=0.0.0.0
 BOOTNODE_PORT=$BOOTNODE_PORT
+NAT_EXTIP=$BOOTNODE_IP
 EOF
 
 # Loop over each node
@@ -48,6 +49,17 @@ EOF
   grep "^ETHERBASE_NODE_${i}=" "$ENV_FILE" | sed "s/ETHERBASE_NODE_${i}/ETHERBASE/" >> "$domain_env"
   grep "^PRIVATE_KEY_NODE_${i}=" "$ENV_FILE" | sed "s/PRIVATE_KEY_NODE_${i}/PRIVATE_KEY/" >> "$domain_env"
 
+  while true; do
+    echo "Please enter the IP ADDRESS of domain$i:"
+    read -r IP_ADDR
+    if [[ $IP_ADDR =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      echo "NAT_EXTIP=$IP_ADDR" >> "$domain_env"
+      break
+    else
+      echo "Invalid IP address format. Try again."
+    fi
+  done
+
   echo "Generating $compose_file..."
   cat <<EOF > "$compose_file"
 # version: '3'
@@ -70,7 +82,7 @@ EOF
       - bootnode.env
     command: *node_entrypoint
     ports:
-      - "${BOOTNODE_PORT}:${BOOTNODE_PORT}" # DISC_PORT
+      - "${BOOTNODE_PORT}:${BOOTNODE_PORT}/udp" # discovery UDP
     volumes:
       - "./$CONFIG_DIR:/src/"
     restart: always
@@ -93,8 +105,9 @@ EOF
     echo "      - bootnode" >> "$compose_file"
   fi
   echo "    ports:" >> "$compose_file"
-  echo "      - \"8545:8545\"" >> "$compose_file"    # JSRONRPC_PORT
-  echo "      - \"30303:30303\"" >> "$compose_file"  # P2P_PORT and DISC_PORT
+  echo "      - \"8545:8545\"" >> "$compose_file"        # rpc HTTP/WS
+  echo "      - \"30303:30303/tcp\"" >> "$compose_file"  # p2p TCP
+  echo "      - \"30303:30303/udp\"" >> "$compose_file"  # discovery UDP
   echo "    restart: always" >> "$compose_file"
   echo "" >> "$compose_file"
 

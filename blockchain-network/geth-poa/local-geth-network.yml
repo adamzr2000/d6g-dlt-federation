@@ -14,8 +14,6 @@ services:
       - BOOTNODE_IP=${BOOTNODE_IP}
       - BOOTNODE_PORT=${BOOTNODE_PORT}
     command: *node_entrypoint
-    ports:
-      - "${BOOTNODE_PORT}:${BOOTNODE_PORT}" # DISC_PORT
     volumes:
       - "./config:/src/"    
     networks:
@@ -42,7 +40,6 @@ services:
     command: *node_entrypoint
     ports:
       - "8545:8545"      # JSRONRPC_PORT
-      - "30303:30303"    # P2P_PORT and DISC_PORT
     volumes:
       - "./config:/src/"
     networks:
@@ -69,7 +66,6 @@ services:
     command: *node_entrypoint
     ports:
       - "8546:8545"      # JSRONRPC_PORT
-      - "30304:30303"    # P2P_PORT and DISC_PORT
     volumes:
       - "./config:/src/"
     networks:
@@ -96,7 +92,6 @@ services:
     command: *node_entrypoint
     ports:
       - "8547:8545"      # JSRONRPC_PORT
-      - "30305:30303"    # P2P_PORT and DISC_PORT
     volumes:
       - "./config:/src/"
     networks:

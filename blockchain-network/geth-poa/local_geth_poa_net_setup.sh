@@ -157,8 +157,6 @@ services:
       - BOOTNODE_IP=\${BOOTNODE_IP}
       - BOOTNODE_PORT=\${BOOTNODE_PORT}
     command: *node_entrypoint
-    ports:
-      - "\${BOOTNODE_PORT}:\${BOOTNODE_PORT}" # DISC_PORT
     volumes:
       - "./$CONFIG_DIR:/src/"    
     networks:
@@ -190,7 +188,6 @@ for (( i=1; i<=$numNodes; i++ )); do
     command: *node_entrypoint
     ports:
       - "$((8544 + $i)):8545"      # JSRONRPC_PORT
-      - "$((30302 + $i)):30303"    # P2P_PORT and DISC_PORT
     volumes:
       - "./$CONFIG_DIR:/src/"
     networks:

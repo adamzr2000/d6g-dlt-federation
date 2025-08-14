@@ -25,34 +25,56 @@ set -euo pipefail
 #   P2P_PORT=30303        (default 30303)
 #   DISC_PORT=30303       (default = P2P_PORT)
 #   SAVE_LOGS=Y           (default: no)
+#   NAT_EXTIP=<HOST_IP>   (if set, use extip for NAT; otherwise default to none)
+#   # (HOST_IP is accepted as a legacy alias for NAT_EXTIP)
 #------------------------------------------------------------------------
 
 : "${IDENTITY:?set IDENTITY (nodeX or bootnode)}"
+
+JSONRPC_TRANSPORT="${JSONRPC_TRANSPORT:-ws}"
+JSONRPC_ADDR="${JSONRPC_ADDR:-0.0.0.0}"
+JSONRPC_PORT="${JSONRPC_PORT:-8545}"
+DATADIR="${DATADIR:-$IDENTITY}"
+GENESIS_FILE="${GENESIS_FILE:-genesis.json}"
+P2P_PORT="${P2P_PORT:-30303}"
+DISC_PORT="${DISC_PORT:-30303}"
+
+# NAT handling: default NONE; if NAT_EXTIP/HOST_IP provided => extip:<value>
+NAT_EXTIP="${NAT_EXTIP:-${HOST_IP:-}}"
 
 # --------- Bootnode mode ---------
 if [[ "${IDENTITY,,}" == "bootnode" ]]; then
   : "${BOOTNODE_IP:?}" "${BOOTNODE_PORT:?}"
   echo "🚀 Starting bootnode on ${BOOTNODE_IP}:${BOOTNODE_PORT}"
-  exec bootnode -nodekey ./bootnode/boot.key -verbosity 9 -addr "${BOOTNODE_IP}:${BOOTNODE_PORT}"
+
+  BN_NAT_ARGS=( -nat none )
+  if [[ -n "$NAT_EXTIP" ]]; then
+    BN_NAT_ARGS=( -nat "extip:${NAT_EXTIP}" )
+  fi
+
+  exec bootnode \
+    -nodekey ./bootnode/boot.key \
+    -verbosity 9 \
+    -addr "${BOOTNODE_IP}:${BOOTNODE_PORT}" \
+    "${BN_NAT_ARGS[@]}"
 fi
 
 # --------- Node mode ---------
-: "${ETHERBASE:?}" "${BOOTNODE_IP:?}" "${BOOTNODE_PORT:?}" "${NETWORK_ID:?}" "${ETH_NETSTATS_SECRET:?}" "${ETH_NETSTATS_IP:?}" "${ETH_NETSTATS_PORT:?}"
-
-JSONRPC_TRANSPORT="${JSONRPC_TRANSPORT:-ws}"
-JSONRPC_ADDR="${JSONRPC_ADDR:-0.0.0.0}"
-JSONRPC_PORT="${JSONRPC_PORT:-8545}"
-DATADIR="$IDENTITY"
-GENESIS_FILE="${GENESIS_FILE:-genesis.json}"
-P2P_PORT="${P2P_PORT:-30303}"
-DISC_PORT="${DISC_PORT:-30303}"
+: "${ETHERBASE:?}" "${BOOTNODE_IP:?}" "${BOOTNODE_PORT:?}" \
+  "${NETWORK_ID:?}" "${ETH_NETSTATS_SECRET:?}" "${ETH_NETSTATS_IP:?}" "${ETH_NETSTATS_PORT:?}"
 
 echo "🔧 Initializing $DATADIR with $GENESIS_FILE"
 geth init --datadir "$DATADIR" "$GENESIS_FILE"
 
-# construct the bootnode enode URL from the key + IP/port
+# construct the bootnode enode URL from the key + IP/port (key must match the bootnode)
 BOOTNODE_ENODE_ID=$(bootnode -writeaddress -nodekey ./bootnode/boot.key)
 BOOTNODE_URL="enode://${BOOTNODE_ENODE_ID}@${BOOTNODE_IP}:${BOOTNODE_PORT}"
+
+# NAT args for geth
+GETH_NAT_ARGS=( --nat none )
+if [[ -n "$NAT_EXTIP" ]]; then
+  GETH_NAT_ARGS=( --nat "extip:${NAT_EXTIP}" )
+fi
 
 # Base command
 cmd=(
@@ -64,7 +86,7 @@ cmd=(
   --networkid "$NETWORK_ID"
   --port "$P2P_PORT"
   --discovery.port "$DISC_PORT"
-  --nat any
+  "${GETH_NAT_ARGS[@]}"
   --allow-insecure-unlock
   --ipcdisable
   --unlock "$ETHERBASE"
@@ -83,8 +105,6 @@ else
   cmd+=(--ws --ws.addr "$JSONRPC_ADDR" --ws.port "$JSONRPC_PORT" --ws.api "eth,net,web3,personal,miner,admin,clique")
 fi
 
-# echo "[INFO] Executing command: ${cmd[*]}"
-
 echo "------------------------------------------------------------------"
 echo "Node:          $IDENTITY"
 echo "NetworkID:     $NETWORK_ID"
@@ -93,6 +113,11 @@ echo "Bootnode:      $BOOTNODE_URL"
 echo "RPC:           $JSONRPC_TRANSPORT://${JSONRPC_ADDR}:${JSONRPC_PORT}"
 echo "Datadir:       $DATADIR"
 echo "Etherbase:     $ETHERBASE"
+if [[ -n "$NAT_EXTIP" ]]; then
+  echo "NAT:           extip:${NAT_EXTIP}"
+else
+  echo "NAT:           none"
+fi
 echo "EthStats:      $ETH_NETSTATS_IP:$ETH_NETSTATS_PORT (secret set)"
 echo "------------------------------------------------------------------"
 
@@ -100,7 +125,7 @@ if [[ "${SAVE_LOGS:-n}" =~ ^[Yy]$ ]]; then
   mkdir -p logs
   cmd+=(--verbosity 3)
   echo "📝 Logging to logs/${IDENTITY}.log"
-  "${cmd[@]}" >> "logs/${IDENTITY}.log" 2>&1
+  exec "${cmd[@]}" >> "logs/${IDENTITY}.log" 2>&1
 else
-  "${cmd[@]}"
+  exec "${cmd[@]}"
 fi
