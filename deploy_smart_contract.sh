@@ -4,7 +4,7 @@
 node_ip=""
 port=""
 protocol="ws"      # default
-network_id="2025"  # default
+network_id="1337"  # default
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -53,7 +53,6 @@ docker run \
   -it \
   --rm \
   --name truffle \
-  --network host \
   -v "$(pwd)/smart-contracts":/smart-contracts \
   -e NODE_IP="$node_ip" \
   -e PORT="$port" \

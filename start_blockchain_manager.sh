@@ -85,13 +85,13 @@ set +o allexport
 # Validate required variables
 : "${ETHERBASE:?Missing ETHERBASE in $config}"
 : "${PRIVATE_KEY:?Missing PRIVATE_KEY in $config}"
-: "${RPC_PROTOCOL:?Missing RPC_PROTOCOL in $config}"
-: "${IP_ADDR:?Missing IP_ADDR in $config}"
-: "${WS_PORT:?Missing WS_PORT in $config}"
+: "${JSONRPC_TRANSPORT:?Missing JSONRPC_TRANSPORT in $config}"
+: "${NAT_EXTIP:?Missing NAT_EXTIP in $config}"
+: "${JSONRPC_PORT:?Missing JSONRPC_PORT in $config}"
 : "${CONTRACT_ADDRESS:?Missing CONTRACT_ADDRESS in smart-contract.env}"
 
 # Build the Web3 node URL
-eth_node_url="${RPC_PROTOCOL}://${IP_ADDR}:${WS_PORT}"
+eth_node_url="${JSONRPC_TRANSPORT}://${NAT_EXTIP}:${JSONRPC_PORT}"
 
 cat <<INFO
 Launching '$container_name':

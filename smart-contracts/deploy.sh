@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # === Read from environment variables ===
 node_ip="${NODE_IP:-}"
 port="${PORT:-}"

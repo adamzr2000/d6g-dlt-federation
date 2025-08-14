@@ -46,7 +46,7 @@ Each of these domains runs:
 
 ### Steps
 
-> ℹ️ Note: Before deploying make sure you update the 'IP_ADDR', 'BOOTNODE_IP', 'NETSTATS_IP' environment variables in the following files with the actual IP address of each respective SMO machine:
+> ℹ️ Note: Before deploying make sure you update the 'NAT_EXTIP', 'BOOTNODE_IP', 'NETSTATS_IP' environment variables in the following files with the actual IP address of each respective SMO machine:
 - [bootnode.env](./blockchain-network/geth-poa/bootnode.env)
 - [domain1.env](./blockchain-network/geth-poa/domain1.env)
 - [domain2.env](./blockchain-network/geth-poa/domain2.env)
@@ -94,7 +94,7 @@ To start the local Ethereum network:
 To deploy the [Federation Smart Contract](./smart-contracts/contracts/Federation.sol) on the blockchain network:
 
 ```bash
-./deploy_smart_contract.sh --node-ip 10.5.15.55 --port 3334
+./deploy_smart_contract.sh --network-id 1337 --node-ip 10.5.15.55 --port 8545 --protocol ws
 ```
 
 > ℹ️ Note: The smart contract can be deployed from any participating node in the network
