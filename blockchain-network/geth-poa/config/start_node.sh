@@ -31,7 +31,7 @@ set -euo pipefail
 
 : "${IDENTITY:?set IDENTITY (nodeX or bootnode)}"
 
-JSONRPC_TRANSPORT="${JSONRPC_TRANSPORT:-ws}"
+JSONRPC_TRANSPORT="${JSONRPC_TRANSPORT:-http}"
 JSONRPC_ADDR="${JSONRPC_ADDR:-0.0.0.0}"
 JSONRPC_PORT="${JSONRPC_PORT:-8545}"
 DATADIR="${DATADIR:-$IDENTITY}"
@@ -44,8 +44,8 @@ NAT_EXTIP="${NAT_EXTIP:-${HOST_IP:-}}"
 
 # --------- Bootnode mode ---------
 if [[ "${IDENTITY,,}" == "bootnode" ]]; then
-  : "${BOOTNODE_IP:?}" "${BOOTNODE_PORT:?}"
-  echo "🚀 Starting bootnode on ${BOOTNODE_IP}:${BOOTNODE_PORT}"
+  : "${BOOTNODE_PORT:?}"
+  echo "🚀 Starting bootnode on :${BOOTNODE_PORT}"
 
   BN_NAT_ARGS=( -nat none )
   if [[ -n "$NAT_EXTIP" ]]; then
@@ -55,7 +55,7 @@ if [[ "${IDENTITY,,}" == "bootnode" ]]; then
   exec bootnode \
     -nodekey ./bootnode/boot.key \
     -verbosity 9 \
-    -addr "${BOOTNODE_IP}:${BOOTNODE_PORT}" \
+    -addr ":${BOOTNODE_PORT}" \
     "${BN_NAT_ARGS[@]}"
 fi
 
@@ -99,10 +99,10 @@ cmd=(
 
 if [[ "$JSONRPC_TRANSPORT" == "http" ]]; then
   echo "🌐 Enabling HTTP JSON-RPC on ${JSONRPC_ADDR}:${JSONRPC_PORT}"
-  cmd+=(--http --http.addr "$JSONRPC_ADDR" --http.port "$JSONRPC_PORT" --http.api "eth,net,web3,personal,miner,admin,clique" --http.corsdomain "*")
+  cmd+=(--http --http.addr "$JSONRPC_ADDR" --http.port "$JSONRPC_PORT" --http.api "eth,net,txpool,debug,web3,personal,miner,admin,clique" --http.vhosts "*" --http.corsdomain "*")
 else
   echo "🌐 Enabling WebSocket JSON-RPC on ${JSONRPC_ADDR}:${JSONRPC_PORT}"
-  cmd+=(--ws --ws.addr "$JSONRPC_ADDR" --ws.port "$JSONRPC_PORT" --ws.api "eth,net,web3,personal,miner,admin,clique")
+  cmd+=(--ws --ws.addr "$JSONRPC_ADDR" --ws.port "$JSONRPC_PORT" --ws.api "eth,net,txpool,debug,web3,personal,miner,admin,clique")
 fi
 
 echo "------------------------------------------------------------------"

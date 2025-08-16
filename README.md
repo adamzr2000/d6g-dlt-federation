@@ -8,6 +8,19 @@ This repository contains the source code for the **DLT-based Federation** module
 
 ## 🚀 Deployment guide
 
+### Build local images (from Dockerfiles)
+Build only the services tagged with the `build` profile:
+```bash
+docker compose --profile build build
+```
+This compiles images defined in [`docker-compose.yml`](./docker-compose.yml) that use the Dockerfiles under [`dockerfiles/`](./dockerfiles).
+
+### Pull external images (from Docker Hub)
+Pull only the images tagged with the `pull` profile:
+```bash
+docker compose --profile pull pull
+```
+
 ### Build the images
 
 From the repository root:
@@ -22,7 +35,10 @@ This will build all images defined in [docker-compose.yml](./docker-compose.yml)
 | **blockchain-manager** | REST API built with [FastAPI](https://github.com/fastapi/fastapi) and [Web3.py](https://web3py.readthedocs.io/en/stable/) to interact with the `Federation Smart Contract` ([details](./dockerfiles/blockchain-manager/))               | ✅ Available |
 | **truffle**            | Development environment based on [Truffle](https://archive.trufflesuite.com/docs/truffle/) for compiling and deploying the [Federation Smart Contract](./smart-contracts/contracts/Federation.sol). ([details](./dockerfiles/truffle/)) | ✅ Available |
 | **eth-netstats**       | Lightweight Ethereum network monitoring dashboard ([details](./dockerfiles/eth-netstats/))                                                                                                                                              | ✅ Available |
+| **blockscout**         | [Blockscout](https://www.blockscout.com/) block explorer ([details](./dockerfiles/eth-netstats/))                                                                                                                                                                            | ✅ Available |
+| **blockscoutpostgres** | Postgres 13 (alpine) for Blockscout ([details](./dockerfiles/eth-netstats/))                                                                                                                                                            | ✅ Available |
 
+> Note: Building/pulling here only prepares images. Run-time stacks (Geth network, Blockscout, etc.) are launched with the compose files under [blockchain-network/geth-poa](./blockchain-network/geth-poa)
 
 ---
 
@@ -37,6 +53,7 @@ This setup creates a basic 3-node private Ethereum network distributed across se
 - **Bootnode** — Acts as the entry point and discovery service, allowing other nodes to join and connect automatically.
 - **Validator node** — Participates in the consensus protocol and maintains a synchronized copy of the distributed ledger.
 - **Monitoring dashboard** — Runs Ethereum network monitoring dahsboard.
+- **Block explorer** — **Blockscout + Postgres**.  
 
 ### 🟨 `domain2` and `domain3` — joining nodes
 
@@ -59,6 +76,7 @@ Each of these domains runs:
 ```
 
 📊 Network dashboard: [http://localhost:3000](http://localhost:3000)
+📊 Block explorer: [http://localhost:26000](http://localhost:26000)
 
 ![geth_dashboard](./utils/geth_net_dashboard.png)
 
@@ -94,7 +112,7 @@ To start the local Ethereum network:
 To deploy the [Federation Smart Contract](./smart-contracts/contracts/Federation.sol) on the blockchain network:
 
 ```bash
-./deploy_smart_contract.sh --network-id 1337 --node-ip 10.5.15.55 --port 8545 --protocol ws
+./deploy_smart_contract.sh --network-id 1337 --node-ip 10.5.15.55 --port 8545 --protocol http
 ```
 
 > ℹ️ Note: The smart contract can be deployed from any participating node in the network

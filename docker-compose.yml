@@ -5,18 +5,31 @@ services:
     build:
       context: ./dockerfiles/blockchain-manager
     image: blockchain-manager:latest
+    profiles: ["build"]
 
   blockchain-node:
     build:
       context: ./dockerfiles/blockchain-node
     image: blockchain-node:geth-poa
+    profiles: ["build"]
 
   eth-netstats:
     build:
       context: ./dockerfiles/eth-netstats
     image: eth-netstats:latest
+    profiles: ["build"]
 
   truffle:
     build:
       context: ./dockerfiles/truffle
     image: truffle:latest
+    profiles: ["build"]
+
+  # pull-only images (Blockscout)
+  blockscout-image:
+    image: consensys/blockscout:v4.1.5-beta
+    profiles: ["pull"]
+
+  blockscoutpostgres-image:
+    image: postgres:13-alpine
+    profiles: ["pull"]

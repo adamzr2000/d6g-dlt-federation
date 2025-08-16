@@ -3,7 +3,7 @@
 # Initialize variables
 node_ip=""
 port=""
-protocol="ws"      # default
+protocol="http"      # default
 network_id="1337"  # default
 
 # Parse arguments

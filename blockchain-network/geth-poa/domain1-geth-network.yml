@@ -43,3 +43,46 @@ services:
     depends_on:
       - node1
     restart: always
+  blockscoutpostgres:
+    image: postgres:13-alpine
+    container_name: blockscoutpostgres
+    restart: on-failure
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+    # volumes:
+    #   - blockscoutpostgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  blockscout:
+    image: consensys/blockscout:v4.1.5-beta
+    container_name: blockscout
+    depends_on:
+      - blockscoutpostgres
+    environment:
+      PORT: "4000"
+      ECTO_USE_SSL: "false"
+      DATABASE_URL: "postgresql://postgres:postgres@blockscoutpostgres:5432/postgres?ssl=false"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_USER: "postgres"
+
+      # ---- Chain metadata ----
+      NETWORK: "D6G Private Blockchain"
+      SUBNETWORK: "Clique PoA"
+      CHAIN_ID: "1337"
+      COIN: "ETH"
+
+      # ---- JSON-RPC wiring to your node1 ----
+      ETHEREUM_JSONRPC_VARIANT: "geth"
+      ETHEREUM_JSONRPC_TRANSPORT: "http"
+      ETHEREUM_JSONRPC_HTTP_URL: "http://node1:8545"
+      ETHEREUM_JSONRPC_TRACE_URL: "http://node1:8545"
+
+    entrypoint: ["/bin/sh","-c","cd /opt/app/; echo  && mix do ecto.create, ecto.migrate; mix phx.server;"]
+    ports:
+      - "26000:4000"

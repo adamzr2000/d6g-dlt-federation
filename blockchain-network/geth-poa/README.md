@@ -38,8 +38,16 @@ A step-by-step toolkit to quickly create, run, and tear down your own private Et
 
      * **Bootnode**: helps nodes discover each other.
      * **Geth nodes**: your validators running in Clique POA mode.
-     * **eth-netstats** (optional): web dashboard at `http://<your_host>:<ETH_NETSTATS_PORT>`.
+     * **eth-netstats** (optional): web dashboard at `http://localhost:3000`.
+     * **blockscout** (optional): block explorer at `http://localhost:26000`.     
 
+   * ** Quick sanity check**:
+   ```shell
+   curl -s -H 'Content-Type: application/json' \
+      --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
+      http://localhost:8545
+   ```
+   
 3. **Stop & tear down**
 
    ```bash

@@ -58,7 +58,9 @@ ETH_NETSTATS_PORT=3000
 BOOTNODE_IP=10.0.0.3
 BOOTNODE_PORT=30301
 SAVE_LOGS=$saveLogs
-JSONRPC_TRANSPORT=ws
+JSONRPC_TRANSPORT=http
+BLOCKSCOUT_IP=10.0.0.4
+BLOCKSCOUT_POSTGRES_IP=10.0.0.5
 EOF
 
 # Generate node addresses and update the .env file
@@ -77,7 +79,7 @@ for (( i=1; i<=$numNodes; i++ )); do
   cat << EOF >> $ENV_FILE
 # Node $i configuration
 ETHERBASE_NODE_$i=$addr
-IP_NODE_$i=10.0.0.$((3 + $i))
+IP_NODE_$i=10.0.0.$((5 + $i))
 EOF
 
   # Append address to extraData and alloc sections
@@ -154,7 +156,6 @@ services:
     hostname: bootnode
     environment:
       - IDENTITY=bootnode
-      - BOOTNODE_IP=\${BOOTNODE_IP}
       - BOOTNODE_PORT=\${BOOTNODE_PORT}
     command: *node_entrypoint
     volumes:
@@ -179,11 +180,11 @@ for (( i=1; i<=$numNodes; i++ )); do
       - IDENTITY=node$i
       - ETHERBASE=\${ETHERBASE_NODE_$i}
       - JSONRPC_TRANSPORT=\${JSONRPC_TRANSPORT}
-      - BOOTNODE_IP=\${BOOTNODE_IP}
+      - BOOTNODE_IP=bootnode
       - BOOTNODE_PORT=\${BOOTNODE_PORT}
       - NETWORK_ID=\${NETWORK_ID}
       - ETH_NETSTATS_SECRET=\${ETH_NETSTATS_SECRET}
-      - ETH_NETSTATS_IP=\${ETH_NETSTATS_IP}
+      - ETH_NETSTATS_IP=eth-netstats
       - ETH_NETSTATS_PORT=\${ETH_NETSTATS_PORT}
     command: *node_entrypoint
     ports:
@@ -211,6 +212,56 @@ cat << EOF >> $DOCKER_COMPOSE_FILE
       blockchain_network:
         ipv4_address: \${ETH_NETSTATS_IP}
     restart: always
+
+  blockscoutpostgres:
+    image: postgres:13-alpine
+    container_name: blockscoutpostgres
+    restart: on-failure
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+    # volumes:
+    #   - blockscoutpostgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+    networks:
+      blockchain_network:
+        ipv4_address: \${BLOCKSCOUT_POSTGRES_IP}
+
+  blockscout:
+    image: consensys/blockscout:v4.1.5-beta
+    container_name: blockscout
+    depends_on:
+      - blockscoutpostgres
+    environment:
+      PORT: "4000"
+      ECTO_USE_SSL: "false"
+      DATABASE_URL: "postgresql://postgres:postgres@blockscoutpostgres:5432/postgres?ssl=false"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_USER: "postgres"
+
+      # ---- Chain metadata ----
+      NETWORK: "D6G Private Blockchain"
+      SUBNETWORK: "Clique PoA"
+      CHAIN_ID: "$chainID"
+      COIN: "ETH"
+
+      # ---- JSON-RPC wiring to your node1 ----
+      ETHEREUM_JSONRPC_VARIANT: "geth"
+      ETHEREUM_JSONRPC_TRANSPORT: "http"
+      ETHEREUM_JSONRPC_HTTP_URL: "http://node1:8545"
+      ETHEREUM_JSONRPC_TRACE_URL: "http://node1:8545"
+
+    entrypoint: ["/bin/sh","-c","cd /opt/app/; echo $MIX_ENV && mix do ecto.create, ecto.migrate; mix phx.server;"]
+    ports:
+      - "26000:4000"
+    networks:
+      blockchain_network:
+        ipv4_address: \${BLOCKSCOUT_IP}
 
 networks:
   blockchain_network:
