@@ -24,7 +24,9 @@ from models import (
     UpdateEndpointRequest,
     PlaceBidRequest,
     ChooseProviderRequest,
-    ServiceDeployedRequest
+    ServiceDeployedRequest,
+    DemoConsumerRequest,
+    DemoProviderRequest
 )
 
 # In-memory subscription store: sub_id → {'request': SubscriptionRequest, 'filter': Filter}
@@ -365,40 +367,40 @@ def service_deployed_endpoint(request: ServiceDeployedRequest):
 
 
 @app.post("/start_demo_consumer", tags=["Consumer functions"])
-def start_demo_consumer():
+def start_demo_consumer(request: DemoConsumerRequest):
     try:
         if domain != 'consumer':
             raise HTTPException(status_code=403, detail="This function is restricted to consumer domains.")
-
-        return run_consumer_federation_demo()
+        requirements = [request.availability, 
+                        request.max_latency_ms, 
+                        request.max_jitter_ms, 
+                        request.min_bandwidth_Mbps, 
+                        request.compute_cpu_mcores, 
+                        request.compute_ram_MB]
+        response = run_consumer_federation_demo(description=request.description, req=requirements, expected_hours=request.expected_hours, offers_to_wait=request.offers_to_wait, export_to_csv=request.export_to_csv, csv_path=request.csv_path)
+        return response
 
     except Exception as e:
         logger.error(f"Federation process failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.post("/start_demo_provider", tags=["Provider functions"])
-def start_demo_provider():
+def start_demo_provider(request: DemoProviderRequest):
     try:
         if domain != 'provider':
             raise HTTPException(status_code=403, detail="This function is restricted to provider domains.")
 
-        response = run_provider_federation_demo()
+        response = run_provider_federation_demo(price_wei_per_hour=request.price_wei_per_hour, location=request.location, description_filter=request.description_filter, export_to_csv=request.export_to_csv, csv_path=request.csv_path)
         return response
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def run_consumer_federation_demo():
+def run_consumer_federation_demo(description, req, expected_hours, offers_to_wait, export_to_csv, csv_path):
     federation_step_times = []  
     header = ['step', 'timestamp']
     data = []
 
-    description = "k8s_deployment" 
-    req = [9999, 50, 20, 1, 2000, 8000]  # availability, max_latency_ms, max_jitter_ms, min_bandwidth_mbps, compute_cpu_mcores, compute_ram_MB
-    offers_to_wait = 1
-    export_to_csv = False
-    csv_path = "federation_demo_consumer.csv"
-    expected_hours = 1
     process_start_time = time.time()
                 
     # Send service announcement (federation request)
@@ -501,15 +503,10 @@ def run_consumer_federation_demo():
         "duration_s": round(total_duration, 2)
     }
     
-def run_provider_federation_demo():
+def run_provider_federation_demo(price_wei_per_hour, location, description_filter, export_to_csv, csv_path):
     federation_step_times = []  
     header = ['step', 'timestamp']
     data = []
-
-    price_wei_per_hour = 10000
-    location = "Madrid, Spain"
-    export_to_csv = False
-    csv_path = "federation_demo_consumer.csv"
 
     process_start_time = time.time()
     open_services = []
@@ -525,7 +522,7 @@ def run_provider_federation_demo():
             service_id = Web3.toText(event['args']['serviceId']).rstrip('\x00')
             description = event['args']['description']
 
-            if blockchain.get_service_state(service_id) == 0:
+            if blockchain.get_service_state(service_id) == 0 and (description_filter is None or description == description_filter):
                 requirements = blockchain.get_service_requirements(service_id) 
                 open_services.append(service_id)
 

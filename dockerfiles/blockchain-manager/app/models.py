@@ -53,3 +53,24 @@ class ChooseProviderRequest(BaseModel):
 
 class ServiceDeployedRequest(BaseModel):
     service_id: str
+
+
+class DemoConsumerRequest(BaseModel):
+    description: Optional[str] = "k8s_deployment"
+    availability: Optional[int] = 0 
+    max_latency_ms: Optional[int] = 0
+    max_jitter_ms: Optional[int] = 0 
+    min_bandwidth_Mbps: Optional[int] = 0
+    compute_cpu_mcores: Optional[int] = 0 
+    compute_ram_MB: Optional[int] = 0 
+    expected_hours: Optional[int] = 1
+    offers_to_wait: Optional[int] = 1
+    export_to_csv: Optional[bool] = False
+    csv_path: Optional[str] = "federation_demo_consumer.csv"
+
+class DemoProviderRequest(BaseModel):
+    price_wei_per_hour: Optional[int] = 10000
+    location: Optional[str] = "Madrid, Spain"
+    description_filter: Optional[str] = None 
+    export_to_csv: Optional[bool] = False
+    csv_path: Optional[str] = "federation_demo_provider.csv"

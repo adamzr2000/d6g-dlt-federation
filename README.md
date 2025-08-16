@@ -68,7 +68,7 @@ Each of these domains runs:
 ```
 
 📊 Network dashboard: [http://localhost:3000](http://localhost:3000)
-📊 Block explorer: [http://localhost:26000](http://localhost:26000)
+🔍 Block explorer: [http://localhost:26000](http://localhost:26000)
 
 ![geth_dashboard](./utils/geth_net_dashboard.png)
 
@@ -130,12 +130,44 @@ To deploy the [Federation Smart Contract](./smart-contracts/contracts/Federation
 # Domain1
 FED_API="localhost:8080"
 curl -X POST "http://$FED_API/register_domain/d6g-domain-1" | jq
-curl -X POST "http://$FED_API/start_demo_consumer" | jq
+
+curl -X POST "http://$FED_API/start_demo_consumer" \
+-H 'Content-Type: application/json' \
+-d '{
+   "description": "k8s_app_deployment",
+   "availability": 9999,
+   "compute_cpu_mcores": 2000,
+   "compute_ram_MB": 4000,
+   "expected_hours": 2,
+   "export_to_csv": false,
+   "csv_path": "federation_demo_consumer.csv"
+}' | jq
+
+curl -X POST "http://$FED_API/start_demo_consumer" \
+-H 'Content-Type: application/json' \
+-d '{
+   "description": "detnet_transport",
+   "max_latency_ms": 50,
+   "max_jitter_ms": 20,
+   "min_bandwidth_Mbps": 1,
+   "expected_hours": 2,
+   "export_to_csv": false,
+   "csv_path": "federation_demo_consumer.csv"
+}' | jq
+
 
 # Domain2
 FED_API="localhost:8080"
 curl -X POST "http://$FED_API/register_domain/d6g-domain-2" | jq
-curl -X POST "http://$FED_API/start_demo_provider" | jq
+curl -X POST "http://$FED_API/start_demo_provider" \
+-H 'Content-Type: application/json' \
+-d '{
+   "price_wei_per_hour": 10000,
+   "location": "Madrid, Spain",
+   "description_filter": None,
+   "export_to_csv": false,
+   "csv_path": "federation_demo_consumer.csv"
+}' | jq
 ```
 
 ### API endpoints
