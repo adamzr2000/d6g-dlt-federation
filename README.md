@@ -21,22 +21,14 @@ Pull only the images tagged with the `pull` profile:
 docker compose --profile pull pull
 ```
 
-### Build the images
-
-From the repository root:
-```bash
-docker compose build
-```
-This will build all images defined in [docker-compose.yml](./docker-compose.yml) using the Dockerfiles under [dockerfiles](./dockerfiles)
-
 | Module                 | Description                                                                                                     | Status       |
 |------------------------|-----------------------------------------------------------------------------------------------------------------|--------------|
 | **blockchain-node**    | Ethereum node image using [Go-Ethereum (Geth)](https://geth.ethereum.org/docs) for private blockchain deployment ([details](./dockerfiles/blockchain-node/))                                                                            | ✅ Available |
 | **blockchain-manager** | REST API built with [FastAPI](https://github.com/fastapi/fastapi) and [Web3.py](https://web3py.readthedocs.io/en/stable/) to interact with the `Federation Smart Contract` ([details](./dockerfiles/blockchain-manager/))               | ✅ Available |
 | **truffle**            | Development environment based on [Truffle](https://archive.trufflesuite.com/docs/truffle/) for compiling and deploying the [Federation Smart Contract](./smart-contracts/contracts/Federation.sol). ([details](./dockerfiles/truffle/)) | ✅ Available |
 | **eth-netstats**       | Lightweight Ethereum network monitoring dashboard ([details](./dockerfiles/eth-netstats/))                                                                                                                                              | ✅ Available |
-| **blockscout**         | [Blockscout](https://www.blockscout.com/) block explorer ([details](./dockerfiles/eth-netstats/))                                                                                                                                                                            | ✅ Available |
-| **blockscoutpostgres** | Postgres 13 (alpine) for Blockscout ([details](./dockerfiles/eth-netstats/))                                                                                                                                                            | ✅ Available |
+| **blockscout**         | [Blockscout](https://www.blockscout.com/) block explorer                                                                                                                                                                            | ✅ Available |
+| **blockscoutpostgres** | Postgres 13 (alpine) for Blockscout                                                                                                                                                            | ✅ Available |
 
 > Note: Building/pulling here only prepares images. Run-time stacks (Geth network, Blockscout, etc.) are launched with the compose files under [blockchain-network/geth-poa](./blockchain-network/geth-poa)
 
@@ -53,7 +45,7 @@ This setup creates a basic 3-node private Ethereum network distributed across se
 - **Bootnode** — Acts as the entry point and discovery service, allowing other nodes to join and connect automatically.
 - **Validator node** — Participates in the consensus protocol and maintains a synchronized copy of the distributed ledger.
 - **Monitoring dashboard** — Runs Ethereum network monitoring dahsboard.
-- **Block explorer** — **Blockscout + Postgres**.  
+- **Block explorer** — Runs Blockscout block explorer
 
 ### 🟨 `domain2` and `domain3` — joining nodes
 
