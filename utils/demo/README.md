@@ -3,7 +3,8 @@
 python3 ssh_blockchain_network.py --start
 ```
 
-[dashboard](http://10.5.15.55:3000)
+- [eth-netstats](http://10.5.15.55:3000)
+- [blockscout](http://10.5.15.55:26000)
 
 # Stop Geth net
 ```bash

@@ -68,10 +68,12 @@ Each of these domains runs:
 ```
 
 📊 Network dashboard: [http://localhost:3000](http://localhost:3000)
-🔍 Block explorer: [http://localhost:26000](http://localhost:26000)
 
 ![geth_dashboard](./utils/geth_net_dashboard.png)
 
+🔍 Block explorer: [http://localhost:26000](http://localhost:26000)
+
+![blockscout](./utils/blockscout.png)
 
 2. Join `domain2` to the network:
 
@@ -113,24 +115,35 @@ To deploy the [Federation Smart Contract](./smart-contracts/contracts/Federation
 
 ### Deploy the blockchain manager
 
+- **domain1**
 ```bash
-# Domain1
 ./start_blockchain_manager.sh --config blockchain-network/geth-poa/domain1.env --domain-function consumer --port 8080
+```
 
-# Domain2
+---
+
+- **domain2**
+```bash
 ./start_blockchain_manager.sh --config blockchain-network/geth-poa/domain2.env --domain-function provider --port 8080
+```
 
-# Domain3
+---
+
+- **domain3**
+```bash
 ./start_blockchain_manager.sh --config blockchain-network/geth-poa/domain3.env --domain-function provider --port 8080
 ```
 
 📚 FastAPI Docs: [http://localhost:8080/docs](http://localhost:8080/docs)
 
+### Demo
+
+- **domain1**
 ```bash
-# Domain1
 FED_API="localhost:8080"
 curl -X POST "http://$FED_API/register_domain/d6g-domain-1" | jq
-
+```
+```bash
 curl -X POST "http://$FED_API/start_demo_consumer" \
 -H 'Content-Type: application/json' \
 -d '{
@@ -142,7 +155,8 @@ curl -X POST "http://$FED_API/start_demo_consumer" \
    "export_to_csv": false,
    "csv_path": "federation_demo_consumer.csv"
 }' | jq
-
+```
+```bash
 curl -X POST "http://$FED_API/start_demo_consumer" \
 -H 'Content-Type: application/json' \
 -d '{
@@ -154,21 +168,47 @@ curl -X POST "http://$FED_API/start_demo_consumer" \
    "export_to_csv": false,
    "csv_path": "federation_demo_consumer.csv"
 }' | jq
+```
 
+---
 
-# Domain2
+- **domain2**
+```bash
 FED_API="localhost:8080"
 curl -X POST "http://$FED_API/register_domain/d6g-domain-2" | jq
+```
+```bash
 curl -X POST "http://$FED_API/start_demo_provider" \
 -H 'Content-Type: application/json' \
 -d '{
+   "description_filter": "k8s_deployment"
    "price_wei_per_hour": 10000,
    "location": "Madrid, Spain",
-   "description_filter": None,
    "export_to_csv": false,
-   "csv_path": "federation_demo_consumer.csv"
+   "csv_path": "federation_demo_provider.csv"
 }' | jq
 ```
+
+---
+
+- **domain3**
+```bash
+FED_API="localhost:8080"
+curl -X POST "http://$FED_API/register_domain/d6g-domain-3" | jq
+```
+```bash
+curl -X POST "http://$FED_API/start_demo_provider" \
+-H 'Content-Type: application/json' \
+-d '{
+   "description_filter": "detnet_transport"
+   "price_wei_per_hour": 10000,
+   "location": "Madrid, Spain",
+   "export_to_csv": false,
+   "csv_path": "federation_demo_provider.csv"
+}' | jq
+```
+
+---
 
 ### API endpoints
 
