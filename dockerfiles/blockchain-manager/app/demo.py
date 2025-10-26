@@ -194,18 +194,19 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             if state == 0:
                 if description_filter is None or description == description_filter:
                     requirements = blockchain.get_service_requirements(service_id)
-                    open_services.append(service_id)
+                    open_services.append((service_id, simplified))
                     print_announcement_table(service_id, description, requirements)
 
                 # (2) "Other announcement" branch (condition preserved exactly)
                 if description_filter != description:
                     mark("{}_other_announce_received".format(simplified))
+                    logger.info(f"ℹ️  Other {simplified} announcement received - Service ID: {service_id}")
 
 
         if open_services:
             _, selected_simplified = open_services[-1]
             # First time we have at least one open service
-            mark(f"{service_id_simplified}_announce_received")
+            mark("{}_announce_received".format(selected_simplified))
             break
         time.sleep(0.1)
 
@@ -213,7 +214,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
     service_id, service_id_simplified = open_services[-1]
 
     # Place bid
-    mark(f"{service_id_simplified}_bid_offer_sent")
+    mark("{}_bid_offer_sent".format(service_id_simplified))
     blockchain.place_bid(service_id, price_wei_per_hour, location)
     logger.info(f"💰 Bid offer sent - Service ID: {service_id}, Price: {price_wei_per_hour} Wei/hour")
 
@@ -227,7 +228,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             for e in new_events
         )
         if matched:
-            mark(f"{service_id_simplified}_winner_received")
+            mark("{}_winner_received".format(service_id_simplified))
             break
         time.sleep(0.1)
 
@@ -237,7 +238,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
     # If this provider is the winner
     if blockchain.is_winner(service_id):
         logger.info(f"🏆 Selected as the winner for service ID: {service_id}.")
-        mark(f"{service_id_simplified}_deployment_start")
+        mark("{}_deployment_start".format(service_id_simplified))
 
         while not blockchain.is_consumer_endpoint_set(service_id):
             time.sleep(0.1)
@@ -247,8 +248,8 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             logger.info("🚀 Starting deployment of DetNet-PREOF service...")
             time.sleep(3)
 
-            mark(f"{service_id_simplified}_deployment_finished")
-            mark(f"{service_id_simplified}_confirm_deployment_sent")
+            mark("{}_deployment_finished".format(service_id_simplified))
+            mark("{}_confirm_deployment_sent".format(service_id_simplified))
             blockchain.service_deployed(service_id)
             logger.info("✅ Service Deployed")
 
@@ -257,20 +258,20 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             time.sleep(3)
             logger.info("🔗 Setting up VXLAN connectivity with the consumer...")
 
-            mark(f"{service_id_simplified}_deployment_finished")
-            mark(f"{service_id_simplified}_confirm_deployment_sent")
+            mark("{}_deployment_finished".format(service_id_simplified))
+            mark("{}_confirm_deployment_sent".format(service_id_simplified))
             blockchain.service_deployed(service_id)
             logger.info("✅ Service Deployed")
 
             # Send deployment info (unchanged fixed CID & step)
-            mark(f"{service_id_simplified}_deployment_info_sent_to_consumer")
+            mark("{}_deployment_info_sent_to_consumer".format(service_id_simplified))
             deployment_manifest_cid = "QmExampleCIDForK8sDeploymentManifest"
             blockchain.update_endpoint(service_id, provider_flag, deployment_manifest_cid)
             logger.info("Endpoint information for inter-domain VXLAN connectivity shared.")
 
     else:
         logger.info(f"❌ Not selected as the winner for service ID: {service_id}.")
-        mark(f"{service_id_simplified}_other_provider_chosen")
+        mark("{}_other_provider_chosen".format(service_id_simplified))
 
         if export_to_csv:
             utils.create_csv_file(csv_path, header, data)
