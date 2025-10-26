@@ -105,7 +105,7 @@ INFO
 
 # Run the container
 docker run \
-  --rm -it \
+  --rm -d \
   --name "$container_name" \
   --hostname "$container_name" \
   -p "${port}:8000" \
