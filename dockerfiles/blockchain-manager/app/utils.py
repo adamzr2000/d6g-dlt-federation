@@ -34,65 +34,6 @@ def extract_service_requirements(formatted_requirements: str) -> dict:
     
     return requirements_dict
 
-
-def extract_service_endpoint(endpoint):
-    match = re.match(r'ip_address=(.*?);vxlan_id=(.*?);vxlan_port=(.*?);federation_net=(.*)', endpoint)
-
-    if match:
-        ip_address = match.group(1)
-        vxlan_id = match.group(2)
-        vxlan_port = match.group(3)
-        federation_net = match.group(4)
-        return ip_address, vxlan_id, vxlan_port, federation_net
-    else:
-        logger.error(f"Invalid endpoint format: {endpoint}")
-        return None, None, None, None
-
-# Function to fetch and parse the topology information
-def fetch_topology_info(url, provider):
-    """
-    Fetch and parse topology information from a given URL.
-    """
-    try:
-        # Send GET request to the specified URL
-        response = requests.get(url)
-        
-        # Check if the request was successful
-        if response.status_code == 200:
-            # Parse the YAML response
-            network_info = yaml.safe_load(response.text)
-            
-            # Extract relevant information
-            if 'network_info' in network_info:
-                network_data = network_info['network_info']
-                
-                # Prepare result dictionary
-                result = {
-                    "protocol": network_data.get("protocol"),
-                    "vxlan_id": network_data.get("vxlan_id"),
-                    "udp_port": network_data.get("udp_port"),
-                    "consumer_tunnel_endpoint": network_data.get("consumer_tunnel_endpoint"),
-                    "provider_tunnel_endpoint": network_data.get("provider_tunnel_endpoint"),
-                }
-                
-                # Conditional fields based on the provider flag
-                if provider:
-                    result["provider_subnet"] = network_data.get("provider_subnet")
-                    result["provider_router_endpoint"] = network_data.get("provider_router_endpoint")
-                else:
-                    result["consumer_subnet"] = network_data.get("consumer_subnet")
-                    result["consumer_router_endpoint"] = network_data.get("consumer_router_endpoint")
-                
-                return result
-            else:
-                return {"error": "Network information not found in the response."}
-        else:
-            return {"error": "Unable to fetch data from the URL.", "status_code": response.status_code}
-    
-    except requests.exceptions.RequestException as e:
-        return {"error": str(e)}
-
-
 # Function to fetch and print the raw YAML response
 def fetch_raw_yaml(url):
     try:
@@ -110,23 +51,14 @@ def fetch_raw_yaml(url):
         print(f"Error: {e}")
 
 def create_csv_file(file_path, header, data):
-    base_dir = Path(file_path)
-    base_dir.mkdir(parents=True, exist_ok=True)
+    file_path = Path(file_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)  # ensure /experiments exists
 
-    # Detect next test index based on existing files
-    existing_files = list(base_dir.glob("federation_events_test_*.csv"))
-    indices = [
-        int(f.stem.split('_')[-1]) for f in existing_files
-        if f.stem.split('_')[-1].isdigit()
-    ]
-    next_index = max(indices) + 1 if indices else 1
-
-    file_name = base_dir / f"federation_events_test_{next_index}.csv"
-
-    with open(file_name, 'w', encoding='UTF8', newline='') as f:
+    with open(file_path, 'w', encoding='UTF8', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(data)
+    logger.info(f"Data saved to {file_path}")
 
 def extract_ip_from_url(url) -> str:
     pattern = r'http://(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+'

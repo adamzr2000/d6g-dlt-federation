@@ -397,7 +397,7 @@ def send_endpoint_info(request: UpdateEndpointRequest):
         tx_hash = s.blockchain.update_endpoint(
             request.service_id,
             s.provider_flag, 
-            request.deployment_manifest_ipfs_cid if request.deployment_manifest_ipfs_cid is not None else 'None',
+            request.deployment_manifest_ipfs_cid,
         )
         return {"tx_hash": tx_hash}    
     except Exception as e:

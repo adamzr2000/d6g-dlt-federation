@@ -117,56 +117,49 @@ To deploy the [Federation Smart Contract](./smart-contracts/contracts/Federation
 
 - **domain1**
 ```bash
-./start_blockchain_manager.sh --config blockchain-network/geth-poa/domain1.env --domain-function consumer --port 8080
+./start_blockchain_manager.sh --config blockchain-network/geth-poa/domain1.env --domain-function consumer --port 8090
 ```
 
 ---
 
 - **domain2**
 ```bash
-./start_blockchain_manager.sh --config blockchain-network/geth-poa/domain2.env --domain-function provider --port 8080
+./start_blockchain_manager.sh --config blockchain-network/geth-poa/domain2.env --domain-function provider --port 8090
 ```
 
 ---
 
 - **domain3**
 ```bash
-./start_blockchain_manager.sh --config blockchain-network/geth-poa/domain3.env --domain-function provider --port 8080
+./start_blockchain_manager.sh --config blockchain-network/geth-poa/domain3.env --domain-function provider --port 8090
 ```
 
-📚 FastAPI Docs: [http://localhost:8080/docs](http://localhost:8080/docs)
+📚 FastAPI Docs: [http://localhost:8090/docs](http://localhost:8090/docs)
 
 ### Demo
 
 - **domain1**
 ```bash
-FED_API="localhost:8080"
+FED_API="localhost:8090"
 curl -X POST "http://$FED_API/register_domain/domain1" | jq
 ```
 ```bash
 curl -X POST "http://$FED_API/start_demo_consumer" \
 -H 'Content-Type: application/json' \
 -d '{
-   "description": "k8s_app_deployment",
-   "availability": 9999,
-   "compute_cpu_mcores": 2000,
-   "compute_ram_MB": 4000,
+   "service1_description": "detnet_transport",
+   "service1_max_latency_ms": 50,
+   "service1_max_jitter_ms": 20,
+   "service1_min_bandwidth_Mbps": 1,
+   "service1_deployment_manifest_cid": "service1_cid",
+   "service2_description": "ros_app_k8s_deployment",
+   "service2_availability": 9999,
+   "service2_compute_cpu_mcores": 2000,
+   "service2_compute_ram_MB": 4000,
+   "service2_deployment_manifest_cid": "service2_cid",
    "expected_hours": 2,
    "export_to_csv": false,
-   "csv_path": "federation_demo_consumer.csv"
-}' | jq
-```
-```bash
-curl -X POST "http://$FED_API/start_demo_consumer" \
--H 'Content-Type: application/json' \
--d '{
-   "description": "detnet_transport",
-   "max_latency_ms": 50,
-   "max_jitter_ms": 20,
-   "min_bandwidth_Mbps": 1,
-   "expected_hours": 2,
-   "export_to_csv": false,
-   "csv_path": "federation_demo_consumer.csv"
+   "csv_path": "/exeriments/data/consumer_domain_1_run_1.csv"
 }' | jq
 ```
 
@@ -174,27 +167,8 @@ curl -X POST "http://$FED_API/start_demo_consumer" \
 
 - **domain2**
 ```bash
-FED_API="localhost:8080"
+FED_API="localhost:8090"
 curl -X POST "http://$FED_API/register_domain/domain2" | jq
-```
-```bash
-curl -X POST "http://$FED_API/start_demo_provider" \
--H 'Content-Type: application/json' \
--d '{
-   "description_filter": "k8s_deployment"
-   "price_wei_per_hour": 10000,
-   "location": "Madrid, Spain",
-   "export_to_csv": false,
-   "csv_path": "federation_demo_provider.csv"
-}' | jq
-```
-
----
-
-- **domain3**
-```bash
-FED_API="localhost:8080"
-curl -X POST "http://$FED_API/register_domain/domain3" | jq
 ```
 ```bash
 curl -X POST "http://$FED_API/start_demo_provider" \
@@ -204,7 +178,26 @@ curl -X POST "http://$FED_API/start_demo_provider" \
    "price_wei_per_hour": 10000,
    "location": "Madrid, Spain",
    "export_to_csv": false,
-   "csv_path": "federation_demo_provider.csv"
+   "csv_path": "/exeriments/data/provider_domain_2_run_1.csv"
+}' | jq
+```
+
+---
+
+- **domain3**
+```bash
+FED_API="localhost:8090"
+curl -X POST "http://$FED_API/register_domain/domain3" | jq
+```
+```bash
+curl -X POST "http://$FED_API/start_demo_provider" \
+-H 'Content-Type: application/json' \
+-d '{
+   "description_filter": "ros_app_k8s_deployment"
+   "price_wei_per_hour": 10000,
+   "location": "Madrid, Spain",
+   "export_to_csv": false,
+   "csv_path": "/exeriments/data/provider_domain_3_run_1.csv"
 }' | jq
 ```
 
@@ -214,7 +207,7 @@ curl -X POST "http://$FED_API/start_demo_provider" \
 
 ### Web3 Info
 ```bash
-FED_API="localhost:8080"
+FED_API="localhost:8090"
 curl -X 'GET' "http://$FED_API/web3_info" | jq
 ```
 
@@ -317,7 +310,7 @@ curl -X POST "http://$FED_API/send_endpoint_info" \
 -H 'Content-Type: application/json' \
 -d '{
    "service_id": "<id>", 
-   "deployment_manifest_ipfs_cid": "<ipfs-cid>",
+   "deployment_manifest_ipfs_cid": "<ipfs-cid>"
 }' | jq
 ``` 
 

@@ -1,6 +1,6 @@
 # demo.py
 import time
-from typing import Dict, List, Tuple
+from typing import List
 from web3 import Web3
 from prettytable import PrettyTable
 import logging
@@ -9,17 +9,22 @@ from blockchain_interface import FederationEvents
 
 logger = logging.getLogger(__name__)
 
+STEP_HEADER = ["step", "t_rel"]
+
 def run_consumer_federation_demo(app, services_to_announce, expected_hours, offers_to_wait, export_to_csv, csv_path):
-    header = ["step", "timestamp"]
     data = []
+    header = STEP_HEADER
     blockchain = app.state.blockchain
     provider_flag = app.state.provider_flag
 
+    # monotonic base
+    rel0 = time.perf_counter()
+
     # ---------- tiny helpers ----------
-    def mark(step: str):
-        t = time.time()
-        data.append([step, t])
-        return t
+    def mark(step):
+        t_rel = time.perf_counter() - rel0
+        data.append([step, t_rel])
+        return t_rel
 
     def wait_for_bids(service_id: str, min_offers: int):
         bids_event = blockchain.create_event_filter(FederationEvents.NEW_BID)
@@ -104,8 +109,9 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
         mark(f"{key}_confirm_deployment_received")
         logger.info("✅ Deployment confirmation received.")
 
-    # Federated service info (same as original; values unused but preserved call)
-    desc, deployment_manifest_cid = blockchain.get_service_info(service_id, provider_flag)
+    # Federated service info
+    _desc, _cid = blockchain.get_service_info(service_id, provider_flag)
+    logger.info(f"Deployment manifest IPFS CID: {_cid}")
 
     # Connectivity setup & test (simulated)
     mark("establish_connection_with_provider_start")
@@ -117,27 +123,28 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
     time.sleep(3)
     mark("e2e_service_running")
 
-    t_end = mark("end")
-    total_duration = t_end - t_start
-    logger.info(f"✅ Federation(s) #1 and #2 successfully completed in {total_duration:.2f} seconds.")
+    t_rel_end = mark("end")  # final timestamp
+    logger.info("✅ Federation(s) #1 and #2 successfully completed in {:.2f} seconds.".format(t_rel_end))
 
     if export_to_csv:
         utils.create_csv_file(csv_path, header, data)
 
-    return {"status": "success", "duration_s": round(total_duration, 2)}
+    return {"status": "success", "duration_s": round(t_rel_end, 2)}
 
 
 def run_provider_federation_demo(app, price_wei_per_hour, location, description_filter, export_to_csv, csv_path):
-    header = ["step", "timestamp"]
+    header = STEP_HEADER
     data = []
     blockchain = app.state.blockchain
     provider_flag = app.state.provider_flag
 
+    rel0 = time.perf_counter()
+
     # ---------- helpers ----------
-    def mark(step: str):
-        t = time.time()
-        data.append([step, t])
-        return t
+    def mark(step):
+        t_rel = time.perf_counter() - rel0
+        data.append([step, t_rel])
+        return t_rel
 
     DESC_DETNET = "detnet_transport"
     DESC_K8S = "ros_app_k8s_deployment"
@@ -231,7 +238,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
 
         if service_to_deploy == DESC_DETNET:
             logger.info("🚀 Starting deployment of DetNet-PREOF service...")
-            time.sleep(1)
+            time.sleep(3)
 
             mark(f"{service_id_simplified}_deployment_finished")
             mark(f"{service_id_simplified}_confirm_deployment_sent")
@@ -240,7 +247,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
 
         else:  # k8s_deployment
             logger.info("🚀 Starting deployment of K8s-based ROS application...")
-            time.sleep(1)
+            time.sleep(3)
             logger.info("🔗 Setting up VXLAN connectivity with the consumer...")
 
             mark(f"{service_id_simplified}_deployment_finished")
@@ -263,9 +270,9 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
 
         return {"message": f"Another provider was chosen for service ID: {service_id}."}
 
-    total_duration = time.time() - data[0][1]  # reuse 'start' timestamp
+    t_rel_end = mark("end")
 
     if export_to_csv:
         utils.create_csv_file(csv_path, header, data)
 
-    return {"status": "success", "duration_s": round(total_duration, 2)}
+    return {"status": "success", "duration_s": round(t_rel_end, 2)}

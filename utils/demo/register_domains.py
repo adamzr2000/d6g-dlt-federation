@@ -10,7 +10,7 @@ DOMAINS = [
     ("domain3", "10.5.99.5:8090"),
 ]
 
-TIMEOUT = 10  # seconds
+TIMEOUT = 30  # seconds
 
 def post_and_print(name: str, endpoint: str) -> bool:
     url = f"http://{endpoint}/register_domain/{name}"

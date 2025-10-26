@@ -35,7 +35,7 @@ NODES = [
     },
 ]
 
-SSH_CONNECT_TIMEOUT = 10  # seconds
+SSH_CONNECT_TIMEOUT = 30  # seconds
 SLEEP_BETWEEN_NODES = 1   # seconds
 
 # —— LOGGER SETUP —— #
