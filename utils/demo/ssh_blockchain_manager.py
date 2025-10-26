@@ -15,7 +15,7 @@ NODES = [
         "script_dir": "/home/desire6g/adam/d6g-dlt-federation",
         "config_file": "blockchain-network/geth-poa/domain1.env",
         "domain_function": "consumer",
-        "port": 8080,
+        "port": 8090,
     },
     {
         "host": "10.5.99.6",
@@ -23,7 +23,7 @@ NODES = [
         "script_dir": "/home/netcom/d6g-dlt-federation",
         "config_file": "blockchain-network/geth-poa/domain2.env",
         "domain_function": "provider",  # fixed typo
-        "port": 8080,
+        "port": 8090,
     },
     {
         "host": "10.5.99.5",
@@ -31,7 +31,7 @@ NODES = [
         "script_dir": "/home/netcom/d6g-dlt-federation",
         "config_file": "blockchain-network/geth-poa/domain3.env",
         "domain_function": "provider",
-        "port": 8080,
+        "port": 8090,
     },
 ]
 

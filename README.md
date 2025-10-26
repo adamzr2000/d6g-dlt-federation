@@ -141,7 +141,7 @@ To deploy the [Federation Smart Contract](./smart-contracts/contracts/Federation
 - **domain1**
 ```bash
 FED_API="localhost:8080"
-curl -X POST "http://$FED_API/register_domain/d6g-domain-1" | jq
+curl -X POST "http://$FED_API/register_domain/domain1" | jq
 ```
 ```bash
 curl -X POST "http://$FED_API/start_demo_consumer" \
@@ -175,7 +175,7 @@ curl -X POST "http://$FED_API/start_demo_consumer" \
 - **domain2**
 ```bash
 FED_API="localhost:8080"
-curl -X POST "http://$FED_API/register_domain/d6g-domain-2" | jq
+curl -X POST "http://$FED_API/register_domain/domain2" | jq
 ```
 ```bash
 curl -X POST "http://$FED_API/start_demo_provider" \
@@ -194,7 +194,7 @@ curl -X POST "http://$FED_API/start_demo_provider" \
 - **domain3**
 ```bash
 FED_API="localhost:8080"
-curl -X POST "http://$FED_API/register_domain/d6g-domain-3" | jq
+curl -X POST "http://$FED_API/register_domain/domain3" | jq
 ```
 ```bash
 curl -X POST "http://$FED_API/start_demo_provider" \
