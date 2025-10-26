@@ -9,8 +9,6 @@ from enum import Enum
 from web3 import Web3, WebsocketProvider, HTTPProvider
 from web3.middleware import geth_poa_middleware
 
-
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class FederationEvents(str, Enum):
@@ -163,20 +161,44 @@ class BlockchainInterface:
             raise Exception(f"An error occurred while creating the filter for event '{event_name}': {str(e)}")
 
         
-    def register_domain(self, domain_name: str) -> str:
+    def register_domain(self, domain_name: str, wait: bool = False, timeout: int = 120) -> str:
         try:
             tx_data = self.contract.functions.addOperator(domain_name).buildTransaction({'from': self.eth_address})
-            return self.send_signed_transaction(tx_data)
+            tx_hash = self.send_signed_transaction(tx_data)
+            if wait:
+                logger.debug(f"Waiting for transaction {tx_hash} to be mined...")
+                receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+
+                if receipt.status != 1:
+                    raise Exception(
+                        f"Transaction {tx_hash} was mined in block {receipt.blockNumber} but failed (status=0)."
+                    )
+
+                logger.debug(f"Transaction {tx_hash} successfully included in block {receipt.blockNumber}")
+
+            return tx_hash
 
         except Exception as e:
             logger.error(f"Failed to register domain: {str(e)}")
             raise Exception(f"Failed to register domain: {str(e)}")
 
 
-    def unregister_domain(self) -> str:
+    def unregister_domain(self, wait: bool = False, timeout: int = 120) -> str:
         try:
             tx_data = self.contract.functions.removeOperator().buildTransaction({'from': self.eth_address})
-            return self.send_signed_transaction(tx_data)
+            tx_hash = self.send_signed_transaction(tx_data)
+            if wait:
+                logger.debug(f"Waiting for transaction {tx_hash} to be mined...")
+                receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+
+                if receipt.status != 1:
+                    raise Exception(
+                        f"Transaction {tx_hash} was mined in block {receipt.blockNumber} but failed (status=0)."
+                    )
+
+                logger.debug(f"Transaction {tx_hash} successfully included in block {receipt.blockNumber}")
+
+            return tx_hash
 
         except Exception as e:
             logger.error(f"Failed to unregister domain: {str(e)}")
@@ -202,15 +224,12 @@ class BlockchainInterface:
             logger.error(f"Failed to announce service: {str(e)}")
             raise Exception(f"Failed to announce service: {str(e)}")
 
-    def update_endpoint(self, service_id: str, is_provider: bool, catalog: str, topo: str, nsd: str, ns: str):
+    def update_endpoint(self, service_id: str, is_provider: bool, deployment_manifest_ipfs_cid: str):
         try:
             tx_data = self.contract.functions.updateEndpoint(
                 is_provider,
                 self.web3.toBytes(text=service_id),
-                catalog,
-                topo,
-                nsd,
-                ns
+                deployment_manifest_ipfs_cid
             ).buildTransaction({'from': self.eth_address})
             return self.send_signed_transaction(tx_data)
 
@@ -321,13 +340,13 @@ class BlockchainInterface:
 
     def get_service_info(self, service_id: str, is_provider: bool):
         try:            
-            service_id, description, catalog, topology, nsd_id, ns_id = self.contract.functions.getServiceInfo(
+            service_id, description, deployment_manifest_ipfs_cid = self.contract.functions.getServiceInfo(
                 self.web3.toBytes(text=service_id),
                 is_provider,
                 self.eth_address
             ).call()
 
-            return description, catalog, topology, nsd_id, ns_id
+            return description, deployment_manifest_ipfs_cid
         except Exception as e:
             logger.error(f"Failed to retrieve deployed info for service_id '{service_id}': {str(e)}")
             raise Exception(f"Failed to retrieve deployed info for service_id '{service_id}': {str(e)}")

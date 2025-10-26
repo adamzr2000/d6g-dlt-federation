@@ -86,3 +86,21 @@ services:
     entrypoint: ["/bin/sh","-c","cd /opt/app/; echo  && mix do ecto.create, ecto.migrate; mix phx.server;"]
     ports:
       - "26000:4000"
+
+  ipfs:
+      image: ipfs/kubo:latest
+      container_name: ipfs
+      command: ["daemon", "--offline"]
+      # volumes:
+      #   - ./ipfs_path:/data/ipfs
+      #   - ./ipfs_export:/export
+      #   - ./ipfs_fuse:/ipfs
+      #   - ./ipns_fuse:/ipns
+      ports:
+        - "4001:4001/tcp"
+        - "4001:4001/udp"
+        - "5001:5001"       # IPFS API (control plane)
+        - "8080:8080"       # HTTP Gateway (to read content by CID/IPNS in a browser)
+      restart: unless-stopped
+      environment:
+        - IPFS_PATH=/data/ipfs

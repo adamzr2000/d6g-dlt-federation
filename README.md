@@ -317,10 +317,7 @@ curl -X POST "http://$FED_API/send_endpoint_info" \
 -H 'Content-Type: application/json' \
 -d '{
    "service_id": "<id>", 
-   "catalog": "http://10.5.15.55:5000/catalog",
-   "topology": "http://10.5.15.55:5000/topology",
-   "nsd_id": "ros-app.yaml",
-   "ns_id": "ros-service-consumer"
+   "deployment_manifest_ipfs_cid": "<ipfs-cid>",
 }' | jq
 ``` 
 

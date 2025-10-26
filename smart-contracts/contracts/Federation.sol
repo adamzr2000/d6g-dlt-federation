@@ -17,10 +17,7 @@ contract Federation {
     }
 
     struct Endpoint {
-        string serviceCatalogDb;
-        string topologyDb;
-        string nsdId;
-        string nsId; 
+        string deploymentManifestIpfsCid; 
     }
 
     struct ServiceRequirements {
@@ -45,7 +42,7 @@ contract Federation {
 
     struct Bid {
         address payable bidAddress;
-        uint priceWeiPerHour; // Cost in wei per hour of service
+        uint256 priceWeiPerHour; // Cost in wei per hour of service
         string location;
     }
     
@@ -169,15 +166,12 @@ contract Federation {
     function updateEndpoint(
         bool isProvider, 
         bytes32 serviceId,
-        string memory endpointServiceCatalogDb, 
-        string memory endpointTopologyDb,
-        string memory endpointNsdId, 
-        string memory endpointNsId
+        string memory deploymentManifestIpfsCid
     ) public onlyRegistered serviceExists(serviceId) {
         Service storage currentService = service[serviceId];
        
-        bytes32 endpointKeccak = keccak256(abi.encodePacked(endpointServiceCatalogDb, endpointTopologyDb, endpointNsdId, endpointNsId));
-        endpoints[endpointKeccak] = Endpoint(endpointServiceCatalogDb, endpointTopologyDb, endpointNsdId, endpointNsId);
+        bytes32 endpointKeccak = keccak256(abi.encodePacked(deploymentManifestIpfsCid));
+        endpoints[endpointKeccak] = Endpoint(deploymentManifestIpfsCid);
 
         if(isProvider) {
             require(currentService.state >= ServiceState.Closed, "Service: not closed");
@@ -219,7 +213,7 @@ contract Federation {
         bytes32 serviceId, 
         bool isProvider, 
         address callAddress
-    ) public view returns (bytes32, string memory, string memory, string memory, string memory, string memory) {
+    ) public view returns (bytes32, string memory, string memory) {
         Service storage currentService = service[serviceId];
         require(operator[callAddress].registered, "Operator: not registered");
         require(currentService.state >= ServiceState.Closed, "Service: not closed");
@@ -228,7 +222,7 @@ contract Federation {
             ? endpoints[currentService.endpointConsumer]
             : endpoints[currentService.endpointProvider];
         
-        require(bytes(ep.nsdId).length > 0, "Endpoint: not yet set");
+        require(bytes(ep.deploymentManifestIpfsCid).length > 0, "Endpoint: not yet set");
 
         if(isProvider) {
             require(currentService.provider == callAddress, "Service: not provider");
@@ -236,20 +230,20 @@ contract Federation {
             require(currentService.creator == callAddress, "Service: not creator");
         }
 
-        return (currentService.serviceId, currentService.description, ep.serviceCatalogDb, ep.topologyDb, ep.nsdId, ep.nsId);
+        return (currentService.serviceId, currentService.description, ep.deploymentManifestIpfsCid);
 
     }
 
-    function getServiceEndpoint(bytes32 endpointId, address callAddress) public view returns (string memory, string memory, string memory, string memory) {
+    function getServiceEndpoint(bytes32 endpointId, address callAddress) public view returns (string memory) {
         require(operator[callAddress].registered, "Operator: not registered");
 
         Endpoint storage ep = endpoints[endpointId];
-        return (ep.serviceCatalogDb, ep.topologyDb, ep.nsdId, ep.nsId);
+        return (ep.deploymentManifestIpfsCid);
     }
 
     function placeBid(
         bytes32 serviceId, 
-        uint32 priceWeiPerHour,
+        uint256 priceWeiPerHour,
         string memory location
     ) public onlyRegistered serviceExists(serviceId) {
         Service storage currentService = service[serviceId];
@@ -270,7 +264,7 @@ contract Federation {
         return bidCount[serviceId];
     }
 
-    function getBidInfo(bytes32 serviceId, uint256 index, address callAddress) public view serviceExists(serviceId) returns (address, uint, uint256, string memory) {
+    function getBidInfo(bytes32 serviceId, uint256 index, address callAddress) public view serviceExists(serviceId) returns (address, uint256, uint256, string memory) {
         require(service[serviceId].creator == callAddress, "Service: caller not creator");
         Bid[] storage bidPool = bids[serviceId];
         require(bidPool.length > 0, "Bid: no bids");

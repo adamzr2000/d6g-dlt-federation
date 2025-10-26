@@ -18,14 +18,14 @@ NODES = [
         "sudo_password": "desire6g2024;"
     },
     {
-        "host": "10.5.99.5",
+        "host": "10.5.99.6",
         "user": "netcom",
         "script_dir": "/home/netcom/d6g-dlt-federation/blockchain-network/geth-poa",
         "network_file": "domain2-geth-network.yml",
         "sudo_password": "netcom;"
     },
     {
-        "host": "10.5.99.6",
+        "host": "10.5.99.5",
         "user": "netcom",
         "script_dir": "/home/netcom/d6g-dlt-federation/blockchain-network/geth-poa",
         "network_file": "domain3-geth-network.yml",
