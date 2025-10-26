@@ -64,7 +64,6 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
         logger.info("⏳ Waiting for provider to complete deployment...")
         while blockchain.get_service_state(service_id) != target_state:
             time.sleep(0.1)
-
     # ---------- start ----------
 
     t_start = mark("start")
@@ -110,6 +109,8 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
         logger.info("✅ Deployment confirmation received.")
 
     # Federated service info
+    while not blockchain.is_provider_endpoint_set(service_id):
+        time.sleep(0.1)
     _desc, _cid = blockchain.get_service_info(service_id, provider_flag)
     logger.info(f"Deployment manifest IPFS CID: {_cid}")
 
@@ -236,6 +237,11 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
         logger.info(f"🏆 Selected as the winner for service ID: {service_id}.")
         mark(f"{service_id_simplified}_deployment_start")
 
+        while not blockchain.is_consumer_endpoint_set(service_id):
+            time.sleep(0.1)
+        _desc, _cid = blockchain.get_service_info(service_id, provider_flag)
+        logger.info(f"Deployment manifest IPFS CID: {_cid}")
+        
         if service_to_deploy == DESC_DETNET:
             logger.info("🚀 Starting deployment of DetNet-PREOF service...")
             time.sleep(3)

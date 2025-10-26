@@ -322,6 +322,20 @@ class BlockchainInterface:
             logger.error(f"Failed to check winner for service_id '{service_id}': {str(e)}")
             raise Exception(f"Failed to check winner for service_id '{service_id}': {str(e)}")
 
+    def is_consumer_endpoint_set(self, service_id: str) -> bool:
+        try:
+            return self.contract.functions.isEndpointSet(self.web3.toBytes(text=service_id), False).call()
+        except Exception as e:
+            logger.error("Failed to check consumer endpoint for '%s': %s", service_id, e)
+            raise
+    
+    def is_provider_endpoint_set(self, service_id: str) -> bool:
+        try:
+            return self.contract.functions.isEndpointSet(self.web3.toBytes(text=service_id), True).call()
+        except Exception as e:
+            logger.error("Failed to check provider endpoint for '%s': %s", service_id, e)
+            raise
+        
     def get_bid_count(self, service_id) -> int:
         try:
             return self.contract.functions.getBidCount(self.web3.toBytes(text=service_id), self.eth_address).call()

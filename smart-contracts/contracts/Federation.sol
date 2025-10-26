@@ -333,6 +333,26 @@ contract Federation {
 
         emit ServiceCancelled(serviceId);
     }
+
+    // Returns true if the endpoint (consumer or provider) has been set for this service.
+    function isEndpointSet(bytes32 serviceId, bool checkProvider)
+        public
+        view
+        serviceExists(serviceId)
+        returns (bool)
+    {
+        Service storage s = service[serviceId];
+        // pick which endpoint id to check
+        bytes32 epId = checkProvider ? s.endpointProvider : s.endpointConsumer;
+
+        if (epId == bytes32(0)) {
+            return false; // nothing stored yet
+        }
+
+        Endpoint storage ep = endpoints[epId];
+        // endpoint considered "set" only if a non-empty CID is stored
+        return bytes(ep.deploymentManifestIpfsCid).length > 0;
+    }
 }
 
 

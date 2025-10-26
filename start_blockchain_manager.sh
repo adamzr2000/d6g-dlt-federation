@@ -114,6 +114,7 @@ docker run \
   --env ETH_NODE_URL="$eth_node_url" \
   --env CONTRACT_ADDRESS="$CONTRACT_ADDRESS" \
   --env DOMAIN_FUNCTION="$domain_function" \
+  --env PYTHONUNBUFFERED=1 \
   -v "$(pwd)/smart-contracts":/smart-contracts \
   -v "$(pwd)/experiments":/experiments \
   -v "$(pwd)/dockerfiles/blockchain-manager/app":/app \

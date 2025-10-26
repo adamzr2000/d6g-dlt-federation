@@ -174,7 +174,7 @@ curl -X POST "http://$FED_API/register_domain/domain2" | jq
 curl -X POST "http://$FED_API/start_demo_provider" \
 -H 'Content-Type: application/json' \
 -d '{
-   "description_filter": "detnet_transport"
+   "description_filter": "detnet_transport",
    "price_wei_per_hour": 10000,
    "location": "Madrid, Spain",
    "export_to_csv": false,
@@ -193,7 +193,7 @@ curl -X POST "http://$FED_API/register_domain/domain3" | jq
 curl -X POST "http://$FED_API/start_demo_provider" \
 -H 'Content-Type: application/json' \
 -d '{
-   "description_filter": "ros_app_k8s_deployment"
+   "description_filter": "ros_app_k8s_deployment",
    "price_wei_per_hour": 10000,
    "location": "Madrid, Spain",
    "export_to_csv": false,
