@@ -107,6 +107,7 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
         wait_for_state(service_id, target_state=2)
         mark(f"{key}_confirm_deployment_received")
         logger.info("✅ Deployment confirmation received.")
+        print()
 
     # Federated service info
     while not blockchain.is_provider_endpoint_set(service_id):
@@ -172,7 +173,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
 
     # ---------- start ----------
     mark("start")
-    open_services: list[str] = []
+    open_services = []
 
     # Initialize simplified id according to the (optional) filter — identical logic.
     service_id_simplified = map_desc_to_simple(description_filter) if description_filter else ""
@@ -188,9 +189,9 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             service_id = Web3.toText(args["serviceId"]).rstrip("\x00")
             description = args["description"]
             state = blockchain.get_service_state(service_id)
+            simplified = map_desc_to_simple(description)
 
             if state == 0:
-                # (1) Matches filter (or no filter) → show & collect
                 if description_filter is None or description == description_filter:
                     requirements = blockchain.get_service_requirements(service_id)
                     open_services.append(service_id)
@@ -198,17 +199,18 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
 
                 # (2) "Other announcement" branch (condition preserved exactly)
                 if description_filter != description:
-                    service_id_simplified = map_desc_to_simple(description)
-                    mark(f"{service_id_simplified}_other_announce_received")
+                    mark("{}_other_announce_received".format(simplified))
+
 
         if open_services:
+            _, selected_simplified = open_services[-1]
             # First time we have at least one open service
             mark(f"{service_id_simplified}_announce_received")
             break
         time.sleep(0.1)
 
     # Select the latest open service (unchanged)
-    service_id = open_services[-1]
+    service_id, service_id_simplified = open_services[-1]
 
     # Place bid
     mark(f"{service_id_simplified}_bid_offer_sent")
@@ -241,7 +243,6 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             time.sleep(0.1)
         _desc, _cid = blockchain.get_service_info(service_id, provider_flag)
         logger.info(f"Deployment manifest IPFS CID: {_cid}")
-        
         if service_to_deploy == DESC_DETNET:
             logger.info("🚀 Starting deployment of DetNet-PREOF service...")
             time.sleep(3)
