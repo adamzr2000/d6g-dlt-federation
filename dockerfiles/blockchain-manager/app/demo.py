@@ -83,8 +83,7 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
             service["requirements"][4],
             service["requirements"][5],
         )
-        logger.info(f"📢 Service announcement sent - Service ID: {service_id}")
-        logger.info(f"ℹ️ Description: {service['description']}")
+        logger.info(f"📢 Service announcement sent (Service ID: '{service_id}', Description: {service['description']})")
 
         # Bids
         bids_count = wait_for_bids(service_id, offers_to_wait)
@@ -94,20 +93,20 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
         best_bid_index, chosen_price = show_bids_and_pick_best(service_id, bids_count)
         mark(f"{key}_winner_chosen")
         tx_hash = blockchain.choose_provider(service_id, best_bid_index, expected_hours, expected_hours * chosen_price)
-        logger.info(f"🏆 Provider selected - Bid index: {best_bid_index}")
+        logger.info(f"🏆 Provider selected (Bid index: {best_bid_index})")
 
         # Send deployment info
         mark(f"{key}_deploy_info_sent_to_provider")
         tx_hash = blockchain.update_endpoint(service_id, provider_flag, service["deployment_manifest_cid"])
         if key == "service1":
-            logger.info("Endpoint information for DetNet-PREOF connectivity shared.")
+            logger.info("Endpoint information for DetNet-PREOF connectivity shared")
         else:
-            logger.info("Endpoint information for application migration and inter-domain VXLAN connectivity shared.")
+            logger.info("Endpoint information for VXLAN connection and ROS app manifest shared")
 
         # Wait for deployment confirmation
         wait_for_state(service_id, target_state=2)
         mark(f"{key}_confirm_deploy_received")
-        logger.info("✅ Deployment confirmation received.")
+        logger.info("✅ Deployment confirmation received")
         print()
 
     # Federated service info
@@ -115,7 +114,7 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
         time.sleep(0.1)
     _desc, _cid = blockchain.get_service_info(service_id, provider_flag)
     mark(f"{key}_get_deploy_info_from_provider")
-    logger.info(f"Deployment manifest IPFS CID: {_cid}")
+    # logger.info(f"Deployment manifest IPFS CID: {_cid}")
 
     # Connectivity setup & test
     mark("establish_connection_with_provider_start")
@@ -159,7 +158,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
 
     def print_announcement_table(service_id: str, description: str, requirements):
         table = PrettyTable()
-        table.title = "📨 New Service Announcement"
+        table.title = "📨 New service announcement received"
         table.field_names = ["Field", "Value"]
         table.align["Field"] = "l"
         table.align["Value"] = "l"
@@ -211,7 +210,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
                 mark("{}_other_announce_received".format(simplified))
                 requirements = blockchain.get_service_requirements(service_id)
                 print_announcement_table(service_id, description, requirements)
-                logger.info("⚠️ Not able to provide this service")
+                logger.info("⚠️ Not able to provide this service. Ignoring announcement...")
                 seen_other.add(simplified)
 
         if open_services:
@@ -227,7 +226,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
     # Place bid
     mark("{}_bid_offer_sent".format(service_id_simplified))
     blockchain.place_bid(service_id, price_wei_per_hour, location)
-    logger.info(f"💰 Bid offer sent - Service ID: {service_id}, Price: {price_wei_per_hour} Wei/hour")
+    logger.info(f"💰 Bid offer sent (Service ID: '{service_id}', Price: {price_wei_per_hour} Wei/hour)")
 
     # Wait for winner
     logger.info("⏳ Waiting for a winner to be selected...")
@@ -248,7 +247,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
 
     # If this provider is the winner
     if blockchain.is_winner(service_id):
-        logger.info(f"🏆 Selected as the winner for service ID: {service_id}.")
+        logger.info(f"🏆 Selected as the winner for '{service_id}'")
         mark("{}_deploy_start".format(service_id_simplified))
 
         while not blockchain.is_consumer_endpoint_set(service_id):
@@ -283,13 +282,13 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             logger.info("✅ Service deployed")
 
     else:
-        logger.info(f"❌ Not selected as the winner for service ID: {service_id}.")
+        logger.info(f"❌ Not selected as the winner for '{service_id}'")
         mark("{}_other_provider_chosen".format(service_id_simplified))
 
         if export_to_csv:
             utils.create_csv_file(csv_path, header, data)
 
-        return {"message": f"Another provider was chosen for service ID: {service_id}."}
+        return {"message": f"Another provider was chosen for '{service_id}'"}
 
     t_rel_end = mark("end")
 
