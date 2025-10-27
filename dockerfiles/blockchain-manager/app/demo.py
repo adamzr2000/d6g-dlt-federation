@@ -209,6 +209,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             # (2) Non-matching announcements: mark/log only once
             elif simplified not in seen_other:
                 mark("{}_other_announce_received".format(simplified))
+                requirements = blockchain.get_service_requirements(service_id)
                 print_announcement_table(service_id, description, requirements)
                 logger.info("⚠️ Not able to provide this service")
                 seen_other.add(simplified)
