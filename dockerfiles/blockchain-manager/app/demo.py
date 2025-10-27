@@ -84,7 +84,7 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
             service["requirements"][5],
         )
         logger.info(f"📢 Service announcement sent - Service ID: {service_id}")
-        logger.info(f"ℹ️ Description: {service["description"]}")
+        logger.info(f"ℹ️ Description: {service['description']}")
 
         # Bids
         bids_count = wait_for_bids(service_id, offers_to_wait)

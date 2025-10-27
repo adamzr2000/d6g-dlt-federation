@@ -22,7 +22,7 @@ NODES = [
         "user": "netcom",
         "script_dir": "/home/netcom/d6g-dlt-federation",
         "config_file": "blockchain-network/geth-poa/domain2.env",
-        "domain_function": "provider",  # fixed typo
+        "domain_function": "provider",
         "port": 8090,
     },
     {
@@ -37,6 +37,11 @@ NODES = [
 
 SSH_CONNECT_TIMEOUT = 30  # seconds
 SLEEP_BETWEEN_NODES = 1   # seconds
+
+# Wait/poll after starting to allow the container to come up
+STARTUP_WAIT_SECONDS = 15
+CHECK_INTERVAL_SECONDS = 1
+CONTAINER_NAME = "blockchain-manager"
 
 # —— LOGGER SETUP —— #
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -65,6 +70,22 @@ def build_stop_cmd():
     # Idempotent stop: only kill if exact-name container exists
     return "docker ps -q -f name=^/blockchain-manager$ | xargs -r docker kill"
 
+def build_is_running_cmd():
+    # Exit 0 if a running container with the exact name exists, else non-zero
+    return 'test -n "$(docker ps -q -f name=^/blockchain-manager$ -f status=running)"'
+
+def wait_for_container_running(conn):
+    """Poll briefly until container is running; return True/False."""
+    check_cmd = build_is_running_cmd()
+    deadline = time.time() + STARTUP_WAIT_SECONDS
+    while time.time() < deadline:
+        # warn=True so we don't raise on non-zero; hide=True to keep output quiet
+        result = conn.run(check_cmd, warn=True, hide=True, pty=False)
+        if result.ok:
+            return True
+        time.sleep(CHECK_INTERVAL_SECONDS)
+    return False
+
 def main():
     failures = 0
     total = len(NODES)
@@ -87,9 +108,18 @@ def main():
         conn = Connection(host=host, user=user, connect_timeout=SSH_CONNECT_TIMEOUT)
 
         try:
-            # warn=False => raise on non-zero exit; lets us catch UnexpectedExit
             result = conn.run(cmd, warn=False, hide=False, pty=False)
-            logger.info(f"[{idx}/{total}] Success on {host} (exit {result.exited})")
+            logger.info(f"[{idx}/{total}] Command OK on {host} (exit {result.exited})")
+
+            if ACTION == "start":
+                # Simple liveness check: container exists and is running
+                alive = wait_for_container_running(conn)
+                if alive:
+                    logger.info(f"[{idx}/{total}] Container '{CONTAINER_NAME}' is RUNNING on {host}.")
+                else:
+                    logger.error(f"[{idx}/{total}] Container '{CONTAINER_NAME}' is NOT running on {host}.")
+                    failures += 1
+
         except UnexpectedExit as e:
             code = e.result.exited if e.result else 1
             logger.error(f"[{idx}/{total}] Command exited non-zero on {host}: {code}")
@@ -98,7 +128,7 @@ def main():
             logger.error(f"[{idx}/{total}] SSH error on {host}: {e}")
             failures += 1
 
-        # small pause between hosts
+        # Optional small pause between hosts
         # if idx < total:
         #     time.sleep(SLEEP_BETWEEN_NODES)
 
