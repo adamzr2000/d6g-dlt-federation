@@ -55,9 +55,9 @@ def run_once(run_idx: int, export_to_csv: bool) -> None:
     print("\n=== RUN {} (concurrent) ===".format(run_idx))
 
     # Build per-run payloads (same as your baseline, just threaded)
-    provider2_csv = "/exeriments/data/provider_domain_2_run_{}.csv".format(run_idx)
-    provider3_csv = "/exeriments/data/provider_domain_3_run_{}.csv".format(run_idx)
-    consumer_csv  = "/exeriments/data/consumer_domain_1_run_{}.csv".format(run_idx)
+    provider2_csv = "/experiments/data/provider_domain_2_run_{}.csv".format(run_idx)
+    provider3_csv = "/experiments/data/provider_domain_3_run_{}.csv".format(run_idx)
+    consumer_csv  = "/experiments/data/consumer_domain_1_run_{}.csv".format(run_idx)
 
     payload_provider2 = {
         "description_filter": "detnet_transport",
