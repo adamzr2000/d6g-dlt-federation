@@ -12,7 +12,7 @@ NODES = [
     {
         "host": "10.5.15.55",
         "user": "desire6g",
-        "script_dir": "/home/desire6g/adam/d6g-dlt-federation",
+        "script_dir": "/home/desire6g/d6g-dlt-federation",
         "config_file": "blockchain-network/geth-poa/domain1.env",
         "domain_function": "consumer",
         "port": 8090,
@@ -99,8 +99,8 @@ def main():
             failures += 1
 
         # small pause between hosts
-        if idx < total:
-            time.sleep(SLEEP_BETWEEN_NODES)
+        # if idx < total:
+        #     time.sleep(SLEEP_BETWEEN_NODES)
 
     if failures:
         logger.error(f"Finished with {failures} failure(s) out of {total} node(s).")

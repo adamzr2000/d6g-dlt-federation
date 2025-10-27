@@ -1,0 +1,25 @@
+---
+apiVersion: v1
+kind: NetworkOverlayConfig
+metadata:
+  name: vxlan-overlay-100
+spec:
+  network:
+    protocol: vxlan
+    vni: 100
+    udpPort: 4747                 
+    overlaySubnet: 172.20.50.0/24  
+  endpoints:                        
+    - name: domain1-robot
+    - name: domain1-edge
+    - name: domain3-edge
+---
+apiVersion: v1
+kind: VtepNodeConfig
+metadata:
+  name: domain3-edge
+spec:
+  overlayRef: vxlan-overlay-100             
+  endpointRef: domain3-edge                 
+  vtepIP: 10.11.7.6                      
+  addressPool: "172.20.50.129-172.20.50.190"  

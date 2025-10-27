@@ -13,7 +13,7 @@ NODES = [
     {
         "host": "10.5.15.55",
         "user": "desire6g",
-        "script_dir": "/home/desire6g/adam/d6g-dlt-federation/blockchain-network/geth-poa",
+        "script_dir": "/home/desire6g/d6g-dlt-federation/blockchain-network/geth-poa",
         "network_file": "domain1-geth-network.yml",
         "sudo_password": "desire6g2024;"
     },

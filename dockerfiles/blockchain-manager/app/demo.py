@@ -68,7 +68,7 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
 
     t_start = mark("start")
 
-    # --- Federation negotiation and execution for service1 and service2 (same flow) ---
+    # --- Federation negotiation and execution for service1 and service2 ---
     for key in ("service1", "service2"):
         service = services_to_announce[key]
 
@@ -84,6 +84,7 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
             service["requirements"][5],
         )
         logger.info(f"📢 Service announcement sent - Service ID: {service_id}")
+        logger.info(f"ℹ️ Description: {service["description"]}")
 
         # Bids
         bids_count = wait_for_bids(service_id, offers_to_wait)
@@ -96,7 +97,7 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
         logger.info(f"🏆 Provider selected - Bid index: {best_bid_index}")
 
         # Send deployment info
-        mark(f"{key}_deployment_info_sent_to_provider")
+        mark(f"{key}_deploy_info_sent_to_provider")
         tx_hash = blockchain.update_endpoint(service_id, provider_flag, service["deployment_manifest_cid"])
         if key == "service1":
             logger.info("Endpoint information for DetNet-PREOF connectivity shared.")
@@ -105,7 +106,7 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
 
         # Wait for deployment confirmation
         wait_for_state(service_id, target_state=2)
-        mark(f"{key}_confirm_deployment_received")
+        mark(f"{key}_confirm_deploy_received")
         logger.info("✅ Deployment confirmation received.")
         print()
 
@@ -113,16 +114,17 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
     while not blockchain.is_provider_endpoint_set(service_id):
         time.sleep(0.1)
     _desc, _cid = blockchain.get_service_info(service_id, provider_flag)
+    mark(f"{key}_get_deploy_info_from_provider")
     logger.info(f"Deployment manifest IPFS CID: {_cid}")
 
-    # Connectivity setup & test (simulated)
+    # Connectivity setup & test
     mark("establish_connection_with_provider_start")
-    logger.info("🔗 Setting up network connectivity with the provider...")
-    time.sleep(3)
+    logger.info("🌐 Creating VXLAN connecton with the provider...")
+    time.sleep(1)
     mark("establish_connection_with_provider_finished")
 
-    logger.info("Testing connectivity with federated instance...")
-    time.sleep(3)
+    logger.info("🌐 Testing connectivity with federated instance...")
+    time.sleep(1)
     mark("e2e_service_running")
 
     t_rel_end = mark("end")  # final timestamp
@@ -174,12 +176,14 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
     # ---------- start ----------
     mark("start")
     open_services = []
+    seen_open_ids = set()      # to avoid re-adding the same open service
+    seen_other = set()
 
     # Initialize simplified id according to the (optional) filter — identical logic.
     service_id_simplified = map_desc_to_simple(description_filter) if description_filter else ""
 
     new_service_event = blockchain.create_event_filter(FederationEvents.SERVICE_ANNOUNCEMENT)
-    logger.info("⏳ Waiting for federation events...")
+    logger.info("🔎 Watching federation events...")
 
     # Wait until we see at least one open service
     while True:
@@ -191,17 +195,23 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             state = blockchain.get_service_state(service_id)
             simplified = map_desc_to_simple(description)
 
-            if state == 0:
-                if description_filter is None or description == description_filter:
+            if state != 0:
+                continue  # only care about open services
+
+            # (1) Matches filter (or no filter) → show & collect once per service ID
+            if description_filter is None or description == description_filter:
+                if service_id not in seen_open_ids:
                     requirements = blockchain.get_service_requirements(service_id)
                     open_services.append((service_id, simplified))
                     print_announcement_table(service_id, description, requirements)
+                    seen_open_ids.add(service_id)
 
-                # (2) "Other announcement" branch (condition preserved exactly)
-                if description_filter != description:
-                    mark("{}_other_announce_received".format(simplified))
-                    logger.info(f"ℹ️  Other {simplified} announcement received - Service ID: {service_id}")
-
+            # (2) Non-matching announcements: mark/log only once
+            elif simplified not in seen_other:
+                mark("{}_other_announce_received".format(simplified))
+                print_announcement_table(service_id, description, requirements)
+                logger.info("⚠️ Not able to provide this service")
+                seen_other.add(simplified)
 
         if open_services:
             _, selected_simplified = open_services[-1]
@@ -238,36 +248,38 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
     # If this provider is the winner
     if blockchain.is_winner(service_id):
         logger.info(f"🏆 Selected as the winner for service ID: {service_id}.")
-        mark("{}_deployment_start".format(service_id_simplified))
+        mark("{}_deploy_start".format(service_id_simplified))
 
         while not blockchain.is_consumer_endpoint_set(service_id):
             time.sleep(0.1)
         _desc, _cid = blockchain.get_service_info(service_id, provider_flag)
-        logger.info(f"Deployment manifest IPFS CID: {_cid}")
+        mark("{}_get_deploy_info_from_consumer".format(service_id_simplified))
+        logger.info(f"Consumer deploy info: {_cid}")
+
         if service_to_deploy == DESC_DETNET:
-            logger.info("🚀 Starting deployment of DetNet-PREOF service...")
-            time.sleep(3)
+            logger.info("🌐 Enabling DetNet-PREOF capabilities in the transport network...")
 
-            mark("{}_deployment_finished".format(service_id_simplified))
-            mark("{}_confirm_deployment_sent".format(service_id_simplified))
+            mark("{}_deploy_finished".format(service_id_simplified))
+            mark("{}_confirm_deploy_sent".format(service_id_simplified))
             blockchain.service_deployed(service_id)
-            logger.info("✅ Service Deployed")
+            logger.info("✅ Service deployed")
 
-        else:  # k8s_deployment
-            logger.info("🚀 Starting deployment of K8s-based ROS application...")
-            time.sleep(3)
-            logger.info("🔗 Setting up VXLAN connectivity with the consumer...")
+        else:
+            logger.info("🌐 Creating VXLAN connecton with the consumer...")
 
-            mark("{}_deployment_finished".format(service_id_simplified))
-            mark("{}_confirm_deployment_sent".format(service_id_simplified))
-            blockchain.service_deployed(service_id)
-            logger.info("✅ Service Deployed")
+            logger.info("🚀 Deploying ROS application container on Kubernetes...")
 
-            # Send deployment info (unchanged fixed CID & step)
-            mark("{}_deployment_info_sent_to_consumer".format(service_id_simplified))
+            mark("{}_deploy_finished".format(service_id_simplified))
+
+            # Send deployment info
+            mark("{}_deploy_info_sent_to_consumer".format(service_id_simplified))
             deployment_manifest_cid = "QmExampleCIDForK8sDeploymentManifest"
             blockchain.update_endpoint(service_id, provider_flag, deployment_manifest_cid)
-            logger.info("Endpoint information for inter-domain VXLAN connectivity shared.")
+            logger.info("VXLAN endpoint shared.")
+
+            mark("{}_confirm_deploy_sent".format(service_id_simplified))
+            blockchain.service_deployed(service_id)
+            logger.info("✅ Service deployed")
 
     else:
         logger.info(f"❌ Not selected as the winner for service ID: {service_id}.")

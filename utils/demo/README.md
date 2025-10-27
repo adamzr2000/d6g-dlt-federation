@@ -23,7 +23,7 @@ python3 register_domains.py
 
 5. Start demo workflow
 ```bash
-python3 run_experiments.py
+python3 run_experiments.py --runs 1 --export false
 ```
 
 5. Stop blockchain managers
