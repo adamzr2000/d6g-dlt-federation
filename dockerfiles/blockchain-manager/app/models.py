@@ -53,20 +53,20 @@ class ServiceDeployedRequest(BaseModel):
 class DemoConsumerRequest(BaseModel):
     service1_description: Optional[str] = "detnet_transport"
     service1_availability: Optional[int] = 0 
-    service1_max_latency_ms: Optional[int] = 50
-    service1_max_jitter_ms: Optional[int] = 20 
-    service1_min_bandwidth_Mbps: Optional[int] = 1
+    service1_max_latency_ms: Optional[int] = 0
+    service1_max_jitter_ms: Optional[int] = 0
+    service1_min_bandwidth_Mbps: Optional[int] = 0
     service1_compute_cpu_mcores: Optional[int] = 0 
     service1_compute_ram_MB: Optional[int] = 0
     service1_deployment_manifest_cid: Optional[str] = None
 
     service2_description: Optional[str] = "ros_app_k8s_deployment"
-    service2_availability: Optional[int] = 9999 
+    service2_availability: Optional[int] = 0 
     service2_max_latency_ms: Optional[int] = 0
     service2_max_jitter_ms: Optional[int] = 0 
     service2_min_bandwidth_Mbps: Optional[int] = 0
-    service2_compute_cpu_mcores: Optional[int] = 2000 
-    service2_compute_ram_MB: Optional[int] = 4000
+    service2_compute_cpu_mcores: Optional[int] = 0 
+    service2_compute_ram_MB: Optional[int] = 0
     service2_deployment_manifest_cid: Optional[str] = None
 
     expected_hours: Optional[int] = 1

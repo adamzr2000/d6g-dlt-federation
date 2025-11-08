@@ -23,6 +23,8 @@ python3 register_domains.py
 
 5. Start demo workflow
 ```bash
+cd ipfs-deploy-info && python3 ipfs_upload.py && cd ..
+
 python3 run_experiments.py --runs 1 --export false
 ```
 

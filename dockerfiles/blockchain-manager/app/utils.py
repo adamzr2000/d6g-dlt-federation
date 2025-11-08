@@ -3,11 +3,10 @@
 import re
 import logging
 import csv
-import ipaddress
 import requests
 import yaml
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 import os
 import json
 import copy
@@ -15,6 +14,14 @@ from yaml.representer import SafeRepresenter
 
 # Get the logger defined in main.py
 logger = logging.getLogger(__name__)
+
+def truncate_text(s: str, max_lines=50, max_chars=5000):
+    lines = s.splitlines()
+    if len(lines) > max_lines:
+        s = "\n".join(lines[:max_lines]) + f"\n... (truncated, +{len(lines)-max_lines} lines)"
+    if len(s) > max_chars:
+        s = s[:max_chars] + f"\n... (truncated to {max_chars} chars)"
+    return s
 
 def extract_service_requirements(formatted_requirements: str) -> dict:
     requirements_dict = {}
@@ -49,17 +56,21 @@ def create_csv_file(file_path, header, data):
         writer.writerows(data)
     logger.info(f"Data saved to {file_path}")
 
-def ipfs_add(file_path: str, api_base: str, pin: bool = True, timeout: int = 30) -> Dict[str, Any]:
+def ipfs_add(file_path: str, api_base: str, pin: bool = True, timeout: int = 30):
     url = f"{api_base}/add"
     params = {"pin": "true" if pin else "false"}
+
+    basename = os.path.basename(file_path)                   # <-- key change
     with open(file_path, "rb") as f:
-        files = {"file": (file_path, f)}
+        files = {"file": (basename, f)}                      # <-- no directories in multipart filename
         r = requests.post(url, params=params, files=files, timeout=timeout)
     r.raise_for_status()
 
-    # /add can return JSON per line (NDJSON). Use the last object.
-    last_line = r.text.strip().splitlines()[-1]
-    return json.loads(last_line)
+    # If IPFS still returns multiple NDJSON lines, pick the file object by Name
+    objs = [json.loads(line) for line in r.text.strip().splitlines() if line.strip()]
+    # Prefer the object whose Name == basename; fallback to last
+    obj = next((o for o in objs if o.get("Name") == basename), objs[-1])
+    return obj  # contains "Hash" (CID), "Name", "Size"
 
 def ipfs_cat(cid: str, api_base: str, timeout: int = 30, decode: bool = True) -> str:
     url = f"{api_base}/cat"
@@ -243,6 +254,16 @@ def vxlan_add_peers(vxlan_iface: str, peers: List[str], base_url: str):
 
 def vxlan_delete(vxlan_iface: str, base_url: str):
     r = requests.delete(f"{base_url}/vxlan/{vxlan_iface}", timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+def vxlan_ping(dst: str, base_url: str, count: int = 4, interval: float = 1.0, timeout: int = 10) -> Dict[str, Any]:
+    """
+    Call the REST /ping endpoint and return parsed JSON.
+    Returns keys: dest, count, interval, sent, received, loss_pct, times_ms, exit_code
+    """
+    params = {"dst": dst, "count": count, "interval": interval}
+    r = requests.get(f"{base_url}/ping", params=params, timeout=timeout)
     r.raise_for_status()
     return r.json()
 

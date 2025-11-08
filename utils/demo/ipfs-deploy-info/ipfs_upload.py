@@ -4,8 +4,8 @@ import os
 from typing import Dict, Any, Union
 import requests
 
-IPFS_ENDPOINT = "http://localhost:5001/api/v0"
-# IPFS_ENDPOINT = "http://10.5.15.55:5001/api/v0"
+# IPFS_ENDPOINT = "http://localhost:5001/api/v0"
+IPFS_ENDPOINT = "http://10.5.15.55:5001/api/v0"
 
 OUTPUT_PATH = "./deployed_cids.json"
 

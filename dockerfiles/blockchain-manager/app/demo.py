@@ -103,9 +103,9 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
         mark(f"{key}_deploy_info_sent_to_provider")
         tx_hash = blockchain.update_endpoint(service_id, provider_flag, service["deployment_manifest_cid"])
         if key == "service1":
-            logger.info("Endpoint information for DetNet-PREOF connectivity shared")
+            logger.info("Endpoint information for L2 connection shared")
         else:
-            logger.info("Endpoint information for VXLAN connection and ROS app manifest shared")
+            logger.info("Endpoint information for VXLAN connection and Kubernetes manifest shared")
 
         # Wait for deployment confirmation
         wait_for_state(service_id, target_state=2)
@@ -155,19 +155,27 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
     table.align["VTEP IP"] = "l"
     table.align["Address pool"] = "l"
 
+    logger.info("ℹ️ Provider input:")
+
     print(table.get_string())
 
     # Connectivity setup & test
     mark("establish_connection_with_provider_start")
-    logger.info("🌐 Creating VXLAN connecton with the provider...")
-    print(vteps)
-    # utils.pretty(utils.vxlan_add_peers("vxlan200", vteps, "http://10.5.1.21:6666")) # Edge
-    # utils.pretty(utils.vxlan_add_peers("vxlan200", vteps, "http://10.3.202.66:6666")) # Robot
+    logger.info("🌐 Creating VXLAN interconnection with provider...")
+
+    provider_vtep = next(x['vtepIP'] for x in vteps if x['name'] == 'domain3-edge')
+    print(provider_vtep)
+
+    # utils.vxlan_add_peers("vxlan200", [provider_vtep], "http://10.5.1.21:6666") # Edge
+    # utils.vxlan_add_peers("vxlan200", [provider_vtep], "http://10.3.202.66:6666") # Robot
     mark("establish_connection_with_provider_finished")
 
-    logger.info("🌐 Testing connectivity with federated instance...")
-    time.sleep(1)
+    logger.info("🌐 Testing connection from robot to federated instance in provider domain...")
+    ping_res = utils.vxlan_ping("127.0.0.1", base_url="http://10.5.1.21:6666", count=5, interval=0.2)
+    print("loss %:", ping_res["loss_pct"], "exit:", ping_res["exit_code"])
+    print("first 5 RTTs (ms):", ping_res["times_ms"][:5])
     mark("e2e_service_running")
+    logger.info("E2E service running")
 
     t_rel_end = mark("end")  # final timestamp
     logger.info("✅ Federation(s) #1 and #2 successfully completed in {:.2f} seconds.".format(t_rel_end))
@@ -301,9 +309,12 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
         if service_to_deploy == DESC_DETNET:
             # logger.info(f"Deployment manifest IPFS CID: {_cid}")
             consumer_deploy_info = utils.ipfs_cat(cid=_cid, api_base=IPFS_ENDPOINT)
-            print(consumer_deploy_info)
 
-            logger.info("🌐 Configuring DetNet-PREOF capabilities in the transport network via SDNc...")
+            logger.info("ℹ️ Consumer input:")
+            logger.info("  • Source IPs: %s", ", ".join(consumer_deploy_info.get("src_ips", [])))
+            logger.info("  • Type of Service (ToS): %s", consumer_deploy_info.get("tos_field"))
+
+            logger.info("🌐 Configuring DetNet-PREOF transport network via SDN controller...")
             SDN_CONTROLLER_ENDPOINT = "http://10.5.15.49:5000/..."
 
             mark("{}_deploy_finished".format(service_id_simplified))
@@ -347,19 +358,23 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             table.align["VTEP IP"] = "l"
             table.align["Address pool"] = "l"
 
-            logger.info("Consumer info:")
-            print(table.get_string())
+            logger.info("ℹ️ Consumer input:")
+            print("  • VXLAN interconnection:\n", table.get_string())
 
-            k8s_yaml = utils.get_k8s_manifest(
+            k8s_manifest = utils.get_k8s_manifest(
                 consumer_deploy_info,
                 include_kinds=["Pod", "Deployment", "Service", "NetworkAttachmentDefinition"],
                 as_yaml=True,
             )
-            print("ROS Kubernetes manifest:\n", k8s_yaml)
+            print("  • Kubernetes manifest (truncated):\n" + utils.truncate_text(k8s_manifest, max_lines=60, max_chars=8000))
     
-            logger.info("🌐 Creating VXLAN connecton with the consumer...")
-            print(vteps)
-            # utils.pretty(utils.vxlan_create(vni, "eno1", udp, "172.20.50.3/24", vteps))
+            logger.info("🌐 Creating VXLAN interconnecton with consumer...")
+            
+            robot_vtep = next(x['vtepIP'] for x in vteps if x['name'] == 'domain1-robot')
+            edge_vtep  = next(x['vtepIP'] for x in vteps if x['name'] == 'domain1-edge')
+            print(robot_vtep, edge_vtep)
+
+            # utils.pretty(utils.vxlan_create(vni, "eno1", udp, "172.20.50.3/24", [robot_vtep, edge_vtep]))
 
             logger.info("🚀 Deploying ROS application container on Kubernetes...")
             K8S_ORCHESTRATOR_ENDPOINT = "http://10.5.99.12:5000/..."
