@@ -392,7 +392,8 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             logger.info("🌐 Creating VXLAN interconnecton with consumer...")
             robot_vtep = next(x['vtepIP'] for x in vteps if x['name'] == 'domain1-robot')
             edge_vtep  = next(x['vtepIP'] for x in vteps if x['name'] == 'domain1-edge')
-            resp = utils.vxlan_create(vni, "eno1", udp, "172.20.50.3/24", [robot_vtep, edge_vtep])
+            VXLAN_CONFIGURATOR_ENDPOINT = "http://10.5.99.12:6666"
+            resp = utils.vxlan_create(vni, "eno1", udp, "172.20.50.3/24", [robot_vtep, edge_vtep], VXLAN_CONFIGURATOR_ENDPOINT)
             utils.pretty(resp)
 
             logger.info("🚀 Deploying ROS application container on Kubernetes...")
