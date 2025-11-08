@@ -155,9 +155,11 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
     table.align["VTEP IP"] = "l"
     table.align["Address pool"] = "l"
 
-    logger.info("ℹ️ Provider input:")
-
-    print(table.get_string())
+    logger.info(
+        "ℹ️ Provider input\n"
+        "%s",
+        table.get_string()
+    )
 
     # Connectivity setup & test
     mark("establish_connection_with_provider_start")
@@ -172,10 +174,14 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
 
     logger.info("🌐 Testing connection from robot to federated instance in provider domain...")
     ping_res = utils.vxlan_ping("127.0.0.1", base_url="http://10.5.1.21:6666", count=5, interval=0.2)
-    print("loss %:", ping_res["loss_pct"], "exit:", ping_res["exit_code"])
-    print("first 5 RTTs (ms):", ping_res["times_ms"][:5])
-    mark("e2e_service_running")
-    logger.info("E2E service running")
+
+    logger.info(
+        "📶 E2E service running\n"
+        "loss %: %s\n",
+        "exit: %s\n",
+        "first 5 RTTs (ms): %s\n",
+        ping_res["loss_pct"], ping_res["exit_code"], ping_res["times_ms"][:5]
+    )
 
     t_rel_end = mark("end")  # final timestamp
     logger.info("✅ Federation(s) #1 and #2 successfully completed in {:.2f} seconds.".format(t_rel_end))
@@ -317,9 +323,12 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
                 src_ips = [src_ips]
             tos = consumer_deploy_info.get("tos_field")
 
-            logger.info("ℹ️ Consumer input:")
-            logger.info("  • Source IPs: %s", ", ".join(src_ips))
-            logger.info("  • Type of Service (ToS): %s", tos)
+            logger.info(
+                "ℹ️ Consumer input\n"
+                "  • Source IPs: %s\n"
+                "  • Type of Service: %s",
+                src_ips, tos,
+            )
 
             logger.info("🌐 Configuring DetNet-PREOF transport network via SDN controller...")
             SDN_CONTROLLER_ENDPOINT = "http://10.5.15.49:5000/..."
@@ -365,16 +374,19 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             table.align["VTEP IP"] = "l"
             table.align["Address pool"] = "l"
 
-            logger.info("ℹ️ Consumer input:")
-            print("  • VXLAN interconnection:\n", table.get_string())
-
             k8s_manifest = utils.get_k8s_manifest(
                 consumer_deploy_info,
                 include_kinds=["Pod", "Deployment", "Service", "NetworkAttachmentDefinition"],
                 as_yaml=True,
             )
-            print("  • Kubernetes manifest (truncated):\n" + utils.truncate_text(k8s_manifest, max_lines=60, max_chars=8000))
-    
+
+            logger.info(
+                "ℹ️ Consumer input\n"
+                "  • VXLAN:\n%s\n"
+                "  • ☸️ Kubernetes manifest (truncated): %s",
+                table.get_string(), utils.truncate_text(k8s_manifest, max_lines=4, max_chars=8000),
+            )
+
             logger.info("🌐 Creating VXLAN interconnecton with consumer...")
             
             robot_vtep = next(x['vtepIP'] for x in vteps if x['name'] == 'domain1-robot')
@@ -396,7 +408,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             deployment_manifest_cid = res["Hash"]
             # deployment_manifest_cid = "QmExampleCIDForK8sDeploymentManifest"
             blockchain.update_endpoint(service_id, provider_flag, deployment_manifest_cid)
-            logger.info("VXLAN endpoint shared.")
+            logger.info("VXLAN and federated instance info shared.")
 
             mark("{}_confirm_deploy_sent".format(service_id_simplified))
             blockchain.service_deployed(service_id)
