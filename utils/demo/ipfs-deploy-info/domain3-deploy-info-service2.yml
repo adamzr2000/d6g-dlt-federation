@@ -6,7 +6,7 @@ metadata:
 spec:
   network:
     protocol: vxlan
-    vni: 100
+    vni: 200
     udpPort: 4747                 
     overlaySubnet: 172.20.50.0/24  
   endpoints:                        

@@ -19,8 +19,7 @@ curl -s http://localhost:6665/health | jq
 ---
 ### Apply manifest:
 ```shell
-curl -s -X POST "http://localhost:6665/apply?wait=true" \
-  -F "file=@alpine-service.yaml" | jq
+curl -s -X POST "http://localhost:6665/apply?wait=true" -F "file=@alpine-service.yaml" | jq
 ```
 ---
 ### List deployments:
@@ -30,12 +29,12 @@ curl -s http://localhost:6665/deployments | jq
 ---
 ### Delete manifest:
 ```shell
-curl -s -X POST "http://localhost:6665/delete" \
-  -F "file=@alpine-service.yaml" | jq
+curl -s -X POST "http://localhost:6665/delete?wait=true&timeout=60" -F "file=@alpine-service.yaml" | jq
 ```
 ---
 ### Delete all:
 ```shell
-curl -s -X POST http://localhost:6665/deployments/delete_all | jq
+curl -s -X POST "http://localhost:6665/deployments/delete_all?wait=true&timeout=60" | jq
 ```
+
 

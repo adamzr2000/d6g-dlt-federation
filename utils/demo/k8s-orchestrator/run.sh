@@ -9,4 +9,5 @@ docker run \
     --privileged \
     -p 6665:8000 \
     -v "$(pwd)/app":/app \
+    -v "./config:/config" \
     $container_image:latest

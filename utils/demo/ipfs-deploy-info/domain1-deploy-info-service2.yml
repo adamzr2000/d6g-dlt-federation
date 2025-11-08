@@ -6,7 +6,7 @@ metadata:
 spec:
   network:
     protocol: VXLAN                 # overlay protocol
-    vni: 100                        # VXLAN Network Identifier
+    vni: 200                        # VXLAN Network Identifier
     udpPort: 4747                   # UDP port for VXLAN encapsulation
     overlaySubnet: 172.20.50.0/24   # tenant/overlay subnet
   endpoints:                        # declare hosts by NAME                  
@@ -31,7 +31,7 @@ metadata:
 spec:
   overlayRef: federation-net                # must match metadata.name above
   endpointRef: domain1-edge                 # must match an endpoints.name above
-  vtepIP: 10.11.7.5                         # underlay IP of this VTEP
+  vtepIP: 10.11.7.4                         # underlay IP of this VTEP
   addressPool: "172.20.50.20-172.20.50.49" # inside overlaySubnet
 
 ---
@@ -57,17 +57,17 @@ spec:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: ros-subscriber
+  name: go1-navigation
   annotations:
     k8s.v1.cni.cncf.io/networks: '[
       { "name": "ros-network", "ips": ["172.20.50.50/24"] }
     ]'
   labels:
     app: digital-twin-service
-    node: ros-subscriber
+    node: go1-navigation
 spec:
   containers:
-    - name: ros-subscriber
+    - name: go1-navigation
       tty: true
       image: dummy-ros-app
       imagePullPolicy: IfNotPresent
@@ -76,11 +76,4 @@ spec:
           value: "http://172.20.50.10:11311"
         - name: ROS_IP
           value: "172.20.50.50"
-        - name: ROS_ROLE
-          value: "subscriber"
-        - name: ROS_TOPIC
-          value: "chatter"
-  nodeSelector:
-    nodetype: edge
-
 ---
