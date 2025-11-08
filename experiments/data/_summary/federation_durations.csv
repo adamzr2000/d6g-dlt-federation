@@ -1,0 +1,4 @@
+domain,runs,mean_duration_s,std_duration_s,mean_offchain_duration_s,std_offchain_duration_s
+consumer_domain_1,10,24.982,2.32,5.6,0.005
+provider_domain_2,10,6.005,1.2,2.4,0.001
+provider_domain_3,10,6.031,1.5,2.2,0.001

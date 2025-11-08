@@ -13,8 +13,9 @@ import argparse
 import json
 import time
 import threading
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 import requests
+from pathlib import Path
 
 # --- Default endpoints (change if needed) ---
 URL_CONSUMER_DOMAIN1 = "http://10.5.15.55:8090/start_demo_consumer"
@@ -24,6 +25,36 @@ URL_PROVIDER_DOMAIN3 = "http://10.5.99.5:8090/start_demo_provider"
 HEADERS = {"Content-Type": "application/json"}
 
 print_lock = threading.Lock()  # keep logs tidy across threads
+
+def load_service_cids() -> Tuple[str, str]:
+    here = Path(__file__).resolve().parent
+    cid_path = here / "ipfs-deploy-info" / "deployed_cids.json"
+    if not cid_path.exists():
+        raise FileNotFoundError(f"CID file not found: {cid_path}")
+
+    with cid_path.open("r", encoding="utf-8") as f:
+        mapping = json.load(f)
+
+    s1 = mapping.get("domain1-deploy-info-service1.json")
+    s2 = mapping.get("domain1-deploy-info-service2.yml")
+
+    missing = []
+    if not s1:
+        missing.append("domain1-deploy-info-service1.json")
+    if not s2:
+        missing.append("domain1-deploy-info-service2.yml")
+
+    if missing:
+        raise KeyError(
+            "Missing CID(s) for: {} in {}".format(", ".join(missing), cid_path)
+        )
+
+    with print_lock:
+        print(f"[cids] Using service1 CID: {s1}")
+        print(f"[cids] Using service2 CID: {s2}")
+
+    return s1, s2
+
 
 def post_json(url: str, payload: Dict[str, Any], timeout: int = 80) -> Dict[str, Any]:
     """POST JSON and return parsed JSON (or raise)."""
@@ -54,6 +85,9 @@ def worker(name: str, url: str, payload: Dict[str, Any], timeout: int, out: Dict
 def run_once(run_idx: int, export_to_csv: bool) -> None:
     print("\n=== RUN {} (concurrent) ===".format(run_idx))
 
+    # Load CIDs for service1 and service2
+    service1_cid, service2_cid = load_service_cids()
+
     # Build per-run payloads (same as your baseline, just threaded)
     provider2_csv = "/experiments/data/provider_domain_2_run_{}.csv".format(run_idx)
     provider3_csv = "/experiments/data/provider_domain_3_run_{}.csv".format(run_idx)
@@ -77,16 +111,16 @@ def run_once(run_idx: int, export_to_csv: bool) -> None:
 
     payload_consumer = {
         "service1_description": "detnet_transport",
+        "service1_availability": 9999,
         "service1_max_latency_ms": 50,
-        "service1_max_jitter_ms": 20,
-        "service1_min_bandwidth_Mbps": 1,
-        "service1_deployment_manifest_cid": "service1_cid",
+        "service1_max_jitter_ms": 10,
+        "service1_min_bandwidth_Mbps": 20,
+        "service1_deployment_manifest_cid": service1_cid,
 
         "service2_description": "ros_app_k8s_deployment",
-        "service2_availability": 9999,
         "service2_compute_cpu_mcores": 2000,
         "service2_compute_ram_MB": 4000,
-        "service2_deployment_manifest_cid": "service2_cid",
+        "service2_deployment_manifest_cid": service2_cid,
 
         "expected_hours": 2,
         "export_to_csv": export_to_csv,

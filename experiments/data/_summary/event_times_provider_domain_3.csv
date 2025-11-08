@@ -1,0 +1,9 @@
+domain,event,runs,mean_t_rel_s,std_t_rel_s
+provider_domain_3,service1_announce_received,10,1.942739,0.067815
+provider_domain_3,service2_announce_received,10,13.950161,0.050316
+provider_domain_3,service2_bid_offer_sent,10,13.950163,0.050316
+provider_domain_3,service2_winner_received,10,19.924478,0.060066
+provider_domain_3,service2_deploy_start,10,19.932759,0.059949
+provider_domain_3,service2_deploy_finished,10,19.949313,0.059616
+provider_domain_3,service2_deploy_info_sent_to_consumer,10,19.949315,0.059616
+provider_domain_3,service2_confirm_deploy_sent,10,19.981356,0.0591

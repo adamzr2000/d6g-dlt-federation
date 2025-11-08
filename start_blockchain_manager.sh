@@ -118,4 +118,5 @@ docker run \
   -v "$(pwd)/smart-contracts":/smart-contracts \
   -v "$(pwd)/experiments":/experiments \
   -v "$(pwd)/dockerfiles/blockchain-manager/app":/app \
+  -v "$(pwd)/utils/demo/ipfs-deploy-info":/ipfs-deploy-info \
   blockchain-manager:latest

@@ -1,0 +1,7 @@
+domain,event,runs,mean_t_rel_s,std_t_rel_s
+provider_domain_2,service1_announce_received,10,1.952105,0.067502
+provider_domain_2,service1_bid_offer_sent,10,1.952111,0.067503
+provider_domain_2,service1_winner_received,10,7.932297,0.070787
+provider_domain_2,service1_deploy_start,10,7.941132,0.070581
+provider_domain_2,service1_deploy_finished,10,7.957242,0.070946
+provider_domain_2,service1_confirm_deploy_sent,10,7.957248,0.070947

@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: NetworkOverlayConfig
 metadata:
-  name: vxlan-overlay-100
+  name: federation-net
 spec:
   network:
     protocol: VXLAN                 # overlay protocol
@@ -12,17 +12,16 @@ spec:
   endpoints:                        # declare hosts by NAME                  
     - name: domain1-robot
     - name: domain1-edge
-    - name: domain3-edge
 ---
 apiVersion: v1
 kind: VtepNodeConfig
 metadata:
   name: domain1-robot
 spec:
-  overlayRef: vxlan-overlay-100             # must match metadata.name above
+  overlayRef: federation-net                # must match metadata.name above
   endpointRef: domain1-robot                # must match an endpoints.name above
   vtepIP: 10.3.202.67                       # underlay IP of this VTEP
-  addressPool: "172.20.50.2-172.20.50.62"   # inside overlaySubnet
+  addressPool: "172.20.50.1-172.20.50.19"   # inside overlaySubnet
 
 ---
 apiVersion: v1
@@ -30,47 +29,58 @@ kind: VtepNodeConfig
 metadata:
   name: domain1-edge
 spec:
-  overlayRef: vxlan-overlay-100             # must match metadata.name above
+  overlayRef: federation-net                # must match metadata.name above
   endpointRef: domain1-edge                 # must match an endpoints.name above
   vtepIP: 10.11.7.5                         # underlay IP of this VTEP
-  addressPool: "172.20.50.65-172.20.50.126" # inside overlaySubnet
+  addressPool: "172.20.50.20-172.20.50.49" # inside overlaySubnet
 
 ---
+
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: ros-network
+spec:
+  config: |
+    {
+      "cniVersion": "0.3.1",
+      "type": "ipvlan",
+      "master": "vxlan200",
+      "mode": "l2",
+      "ipam": {
+        "type": "static"
+      }
+    }
+
+---
+
 apiVersion: v1
 kind: Pod
 metadata:
-  name: go1-navigation
+  name: ros-subscriber
   annotations:
     k8s.v1.cni.cncf.io/networks: '[
       { "name": "ros-network", "ips": ["172.20.50.50/24"] }
     ]'
   labels:
     app: digital-twin-service
-    node: go1-navigation
+    node: ros-subscriber
 spec:
   containers:
-  - name: go1-navigation
-    image: go1-navigation
-    imagePullPolicy: IfNotPresent
-    env:
-    - name: ROS_MASTER_URI
-      value: "http://172.20.50.10:11311"
-    - name: ROS_IP
-      value: "172.20.50.50"
-    - name: USE_ODOM
-      value: "true"
-    - name: USE_IMU
-      value: "false"
-    - name: NAVIGATE
-      value: "false"
-    - name: SLAM_ALGORITHM
-      value: "cartographer" # cartographer, hector, gmapping
-  tolerations:
-  - key: node-role.kubernetes.io/master
-    operator: Exists
-    effect: NoSchedule
-  - key: node-role.kubernetes.io/control-plane
-    operator: Exists
-    effect: NoSchedule
+    - name: ros-subscriber
+      tty: true
+      image: dummy-ros-app
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: ROS_MASTER_URI
+          value: "http://172.20.50.10:11311"
+        - name: ROS_IP
+          value: "172.20.50.50"
+        - name: ROS_ROLE
+          value: "subscriber"
+        - name: ROS_TOPIC
+          value: "chatter"
+  nodeSelector:
+    nodetype: edge
 
 ---

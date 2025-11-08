@@ -7,6 +7,12 @@ import ipaddress
 import requests
 import yaml
 from pathlib import Path
+from __future__ import annotations
+from typing import Any, Dict, List, Optional, Union
+import os
+import json
+import copy
+from yaml.representer import SafeRepresenter
 
 # Get the logger defined in main.py
 logger = logging.getLogger(__name__)
@@ -34,22 +40,6 @@ def extract_service_requirements(formatted_requirements: str) -> dict:
     
     return requirements_dict
 
-# Function to fetch and print the raw YAML response
-def fetch_raw_yaml(url):
-    try:
-        # Send GET request to the specified URL
-        response = requests.get(url)
-        
-        # Check if the request was successful
-        if response.status_code == 200:
-            # Print the entire raw YAML content
-            print(response.text)
-        else:
-            print(f"Error: Unable to fetch data from the URL. Status code: {response.status_code}")
-    
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {e}")
-
 def create_csv_file(file_path, header, data):
     file_path = Path(file_path)
     file_path.parent.mkdir(parents=True, exist_ok=True)  # ensure /experiments exists
@@ -60,73 +50,202 @@ def create_csv_file(file_path, header, data):
         writer.writerows(data)
     logger.info(f"Data saved to {file_path}")
 
-def extract_ip_from_url(url) -> str:
-    pattern = r'http://(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+'
-    match = re.match(pattern, url)
-    
-    if match:
-        return match.group(1)
-    else:
-        return None
+def ipfs_add(file_path: str, api_base: str, pin: bool = True, timeout: int = 30) -> Dict[str, Any]:
+    url = f"{api_base}/add"
+    params = {"pin": "true" if pin else "false"}
+    with open(file_path, "rb") as f:
+        files = {"file": (file_path, f)}
+        r = requests.post(url, params=params, files=files, timeout=timeout)
+    r.raise_for_status()
 
-def create_smaller_subnet(original_cidr, identifier, prefix_length=24) -> str:
-    ip, _ = original_cidr.split('/')
-    octets = ip.split('.')
-    octets[2] = identifier  # Modify the third octet with the identifier
-    new_ip = '.'.join(octets)
-    new_cidr = f"{new_ip}/{prefix_length}"
-    return new_cidr
+    # /add can return JSON per line (NDJSON). Use the last object.
+    last_line = r.text.strip().splitlines()[-1]
+    return json.loads(last_line)
 
-def get_ip_range_from_subnet(subnet: str) -> str:
-    try:
-        # Parse the subnet
-        network = ipaddress.ip_network(subnet)
+def ipfs_cat(cid: str, api_base: str, timeout: int = 30, decode: bool = True) -> str:
+    url = f"{api_base}/cat"
+    r = requests.post(url, params={"arg": cid}, timeout=timeout)
+    r.raise_for_status()
+    if decode:
+        try:
+            return r.content.decode("utf-8")
+        except UnicodeDecodeError:
+            return r.content.decode("latin-1", errors="replace")
+    return r.content
 
-        # Get the first and last IP address in the range
-        first_ip = str(network.network_address + 1)  # Skip the network address
-        last_ip = str(network.broadcast_address - 1)  # Skip the broadcast address
+def load_yaml_file(path: str) -> List[Dict[str, Any]]:
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"YAML file not found: {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        docs = [doc for doc in yaml.safe_load_all(f) if isinstance(doc, dict)]
+    if not docs:
+        raise ValueError(f"No YAML documents found in: {path}")
+    return docs
 
-        # Return the range in "first_ip-last_ip" format
-        return f"{first_ip}-{last_ip}"
-    
-    except ValueError as e:
-        return f"Invalid subnet: {e}"
+class _LiteralStr(str):
+    """Marker to dump a Python str using YAML literal block style ('|')."""
+    pass
 
-def validate_endpoint(endpoint: str) -> bool:
+def _literal_str_representer(dumper, data):
+    return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+
+class _LiteralDumper(yaml.SafeDumper):
+    pass
+
+_LiteralDumper.add_representer(_LiteralStr, _literal_str_representer)
+
+
+def _beautify_multus_nad_config(obj: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Validates the 'endpoint' string.
-    Expected format: 'ip_address=<ip_address>;vxlan_id=<vxlan_id>;vxlan_port=<vxlan_port>;federation_net=<federation_net>'
+    If obj is a NetworkAttachmentDefinition and spec.config is a JSON string,
+    dump it as a YAML literal block (|) and pretty-indent the JSON.
     """
-    pattern = r'^ip_address=\d{1,3}(\.\d{1,3}){3};vxlan_id=\d+;vxlan_port=\d+;federation_net=\d{1,3}(\.\d{1,3}){3}/\d+$'
-    if re.match(pattern, endpoint):
-        return True
-    return False
+    if not isinstance(obj, dict):
+        return obj
+    if obj.get("kind") != "NetworkAttachmentDefinition":
+        return obj
 
-def configure_router(api_url, sudo_password, local_ip, remote_ip, interface, vni, dst_port, destination_network, tunnel_ip, gateway_ip):
-    payload = {
-        "sudo_password": sudo_password,
-        "local_ip": local_ip,
-        "remote_ip": remote_ip,
-        "interface": interface,
-        "vni": vni,
-        "dst_port": dst_port,
-        "destination_network": destination_network,
-        "tunnel_ip": tunnel_ip,
-        "gateway_ip": gateway_ip
-    }
-    response = requests.post(f"{api_url}/configure_router", json=payload)
-    return response.json()
+    spec = obj.get("spec") or {}
+    cfg = spec.get("config")
+    if isinstance(cfg, str) and cfg.strip():
+        pretty = cfg.strip()
+        # Try to pretty-print JSON if valid; otherwise keep as-is
+        try:
+            pretty = json.dumps(json.loads(pretty), indent=2)
+        except Exception:
+            pass
+        # Ensure trailing newline so the block prints cleanly
+        spec["config"] = _LiteralStr(pretty + ("\n" if not pretty.endswith("\n") else ""))
+        obj["spec"] = spec
+    return obj
 
-def remove_vxlan(api_url, sudo_password, vni, destination_network):
-    payload = {
-        "sudo_password": sudo_password,
-        "vni": vni,
-        "destination_network": destination_network
-    }
-    response = requests.post(f"{api_url}/remove_vxlan", json=payload)
-    return response.json()
+def get_vxlan_network_config(
+    docs: List[Dict[str, Any]],
+    overlay_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    for doc in docs:
+        if doc.get("kind") == "NetworkOverlayConfig":
+            if overlay_name and doc.get("metadata", {}).get("name") != overlay_name:
+                continue
+            spec = doc.get("spec", {}) or {}
+            net = spec.get("network", {}) or {}
+            endpoints = spec.get("endpoints", []) or []
+            return {
+                "name": doc.get("metadata", {}).get("name"),
+                "vni": net.get("vni"),
+                "overlaySubnet": net.get("overlaySubnet"),
+                "udpPort": net.get("udpPort"),
+                "endpoints": [e.get("name") for e in endpoints if isinstance(e, dict)],
+            }
+    raise ValueError("No NetworkOverlayConfig found"
+                     + (f" with name '{overlay_name}'" if overlay_name else ""))
 
-def test_connectivity(api_url, target):
-    payload = {"target": target}
-    response = requests.post(f"{api_url}/test_connectivity", json=payload)
-    return response.json()
+def _find_overlay(
+    docs: List[Dict[str, Any]],
+    overlay_name: str
+) -> Dict[str, Any]:
+    for doc in docs:
+        if doc.get("kind") == "NetworkOverlayConfig" and doc.get("metadata", {}).get("name") == overlay_name:
+            spec = doc.get("spec", {}) or {}
+            net = spec.get("network", {}) or {}
+            endpoints = spec.get("endpoints", []) or []
+            return {
+                "name": overlay_name,
+                "vni": net.get("vni"),
+                "overlaySubnet": net.get("overlaySubnet"),
+                "udpPort": net.get("udpPort"),
+                "protocol": net.get("protocol"),
+                "endpoints": [e.get("name") for e in endpoints if isinstance(e, dict)],
+            }
+    raise ValueError(f"No NetworkOverlayConfig found with name '{overlay_name}'")
+
+def get_vtep_node_config(
+    docs: List[Dict[str, Any]],
+    node_name: str,
+    overlay_name: Optional[str] = None,
+    include_overlay: bool = True,
+) -> Dict[str, Any]:
+    # First locate the VTEP node
+    match: Dict[str, Any] = {}
+    for doc in docs:
+        if doc.get("kind") == "VtepNodeConfig" and doc.get("metadata", {}).get("name") == node_name:
+            spec = doc.get("spec", {}) or {}
+            match = {
+                "name": node_name,
+                "overlayRef": spec.get("overlayRef"),
+                "endpointRef": spec.get("endpointRef"),
+                "vtepIP": spec.get("vtepIP"),
+                "addressPool": spec.get("addressPool"),
+            }
+            break
+    if not match:
+        raise ValueError(f"No VtepNodeConfig found for node '{node_name}'")
+
+    # If caller specified an overlay_name, ensure it matches the node's overlayRef
+    if overlay_name is not None and match.get("overlayRef") != overlay_name:
+        raise ValueError(
+            f"VTEP '{node_name}' overlayRef='{match.get('overlayRef')}' "
+            f"does not match requested overlay_name='{overlay_name}'"
+        )
+
+    # Optionally attach overlay details (resolve either requested overlay_name or node's overlayRef)
+    if include_overlay:
+        resolved_overlay_name = overlay_name or match.get("overlayRef")
+        if resolved_overlay_name:
+            match["overlay"] = _find_overlay(docs, resolved_overlay_name)
+
+    return match
+
+def get_k8s_manifest(
+    docs: List[Dict[str, Any]],
+    include_kinds: Optional[List[str]] = None,
+    as_yaml: bool = False,
+):
+    """
+    Collect a unified manifest of selected Kubernetes resource kinds.
+    Defaults: Pod, Deployment, Service, NetworkAttachmentDefinition (Multus).
+    Returns list[dict], or multi-doc YAML if as_yaml=True.
+    """
+    default_kinds = {"Pod", "Deployment", "Service", "NetworkAttachmentDefinition"}
+    kinds = set(include_kinds) if include_kinds else default_kinds
+
+    selected = [d for d in docs if isinstance(d, dict) and d.get("kind") in kinds]
+    if not selected:
+        raise ValueError(f"No Kubernetes manifests found for kinds: {sorted(kinds)}")
+
+    # Work on a copy so we don’t mutate the original docs
+    selected = [copy.deepcopy(d) for d in selected]
+    # Beautify Multus NAD config so it prints as a literal block
+    selected = [_beautify_multus_nad_config(d) for d in selected]
+
+    if as_yaml:
+        # Use our dumper that knows how to print _LiteralStr with '|'
+        return "\n---\n".join(
+            yaml.dump(d, Dumper=_LiteralDumper, sort_keys=False).strip() for d in selected
+        )
+
+    return selected
+
+
+def vxlan_create(vni: int, iface: str, port: int, vxlan_ip: str,
+                 remote_ips: List[str], base_url: str):
+    r = requests.post(f"{base_url}/vxlan",
+                      json={"vni": vni, "iface": iface, "port": port,
+                            "vxlan_ip": vxlan_ip, "remote_ips": remote_ips},
+                      timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+def vxlan_add_peers(vxlan_iface: str, peers: List[str], base_url: str):
+    r = requests.post(f"{base_url}/vxlan/{vxlan_iface}/peers",
+                      json={"peers": peers}, timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+def vxlan_delete(vxlan_iface: str, base_url: str):
+    r = requests.delete(f"{base_url}/vxlan/{vxlan_iface}", timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+def pretty(obj):  # tiny helper
+    print(json.dumps(obj, indent=2))

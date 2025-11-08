@@ -1,0 +1,12 @@
+domain,event,runs,mean_t_rel_s,std_t_rel_s
+consumer_domain_1,service1_announced,10,1.5e-05,4e-06
+consumer_domain_1,service1_bid_offer_received,10,4.945932,0.044866
+consumer_domain_1,service1_winner_chosen,10,4.96852,0.047503
+consumer_domain_1,service1_deploy_info_sent_to_provider,10,5.038262,0.057411
+consumer_domain_1,service1_confirm_deploy_received,10,10.928621,0.065466
+consumer_domain_1,service2_announced,10,10.928959,0.065464
+consumer_domain_1,service2_bid_offer_received,10,16.940471,0.068093
+consumer_domain_1,service2_winner_chosen,10,16.958743,0.068899
+consumer_domain_1,service2_deploy_info_sent_to_provider,10,17.021873,0.071729
+consumer_domain_1,service2_confirm_deploy_received,10,22.939074,0.067024
+consumer_domain_1,e2e_service_running,10,24.9824,0.063942

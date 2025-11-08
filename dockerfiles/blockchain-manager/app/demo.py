@@ -2,12 +2,16 @@
 import time
 from typing import List
 from web3 import Web3
-from prettytable import PrettyTable
+from prettytable import PrettyTable, ALL
 import logging
 import utils
+import tempfile
+import os
 from blockchain_interface import FederationEvents
 
 logger = logging.getLogger(__name__)
+
+IPFS_ENDPOINT = "http://10.5.15.55:5001/api/v0"
 
 STEP_HEADER = ["step", "t_rel"]
 
@@ -114,12 +118,51 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
         time.sleep(0.1)
     _desc, _cid = blockchain.get_service_info(service_id, provider_flag)
     mark(f"{key}_get_deploy_info_from_provider")
+
     # logger.info(f"Deployment manifest IPFS CID: {_cid}")
+    ipfs_file_content = utils.ipfs_cat(cid=_cid, api_base=IPFS_ENDPOINT)
+    ipfs_tmp_dir = tempfile.mkdtemp(prefix="federation-tmp-")
+    ipfs_tmp_file = os.path.join(ipfs_tmp_dir, os.path.basename("deploy.yml"))
+    with open(ipfs_tmp_file, "w", encoding="utf-8") as f:
+        f.write(ipfs_file_content)
+    provider_deploy_info = utils.load_yaml_file(ipfs_tmp_file)
+
+    # Extract VXLAN + VTEP info
+    vxlan = utils.get_vxlan_network_config(provider_deploy_info, overlay_name="federation-net")
+    vtep_names: List[str] = vxlan.get("endpoints", []) or []
+    vteps = [
+        utils.get_vtep_node_config(
+            provider_deploy_info,
+            node_name=n,
+            overlay_name=vxlan["name"],
+            include_overlay=False,
+        )
+        for n in vtep_names
+    ]
+
+    # Build table
+    table = PrettyTable(hrules=ALL)
+    vni    = vxlan.get("vni", "-")
+    udp    = vxlan.get("udpPort", "-")
+    subnet = vxlan.get("overlaySubnet", "-")
+    table.title = f"VXLAN network (VNI: {vni}, UDP: {udp}, Subnet: {subnet})"
+    table.field_names = ["Node", "VTEP IP", "Address pool"]
+
+    for v in sorted(vteps, key=lambda x: x.get("name", "")):
+        table.add_row([v.get("name", "-"), v.get("vtepIP", "-"), v.get("addressPool", "-")])
+
+    table.align["Node"] = "l"
+    table.align["VTEP IP"] = "l"
+    table.align["Address pool"] = "l"
+
+    print(table.get_string())
 
     # Connectivity setup & test
     mark("establish_connection_with_provider_start")
     logger.info("🌐 Creating VXLAN connecton with the provider...")
-    time.sleep(1)
+    print(vteps)
+    # utils.pretty(utils.vxlan_add_peers("vxlan200", vteps, "http://10.5.1.21:6666")) # Edge
+    # utils.pretty(utils.vxlan_add_peers("vxlan200", vteps, "http://10.3.202.66:6666")) # Robot
     mark("establish_connection_with_provider_finished")
 
     logger.info("🌐 Testing connectivity with federated instance...")
@@ -254,10 +297,14 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             time.sleep(0.1)
         _desc, _cid = blockchain.get_service_info(service_id, provider_flag)
         mark("{}_get_deploy_info_from_consumer".format(service_id_simplified))
-        logger.info(f"Consumer deploy info: {_cid}")
 
         if service_to_deploy == DESC_DETNET:
-            logger.info("🌐 Enabling DetNet-PREOF capabilities in the transport network...")
+            # logger.info(f"Deployment manifest IPFS CID: {_cid}")
+            consumer_deploy_info = utils.ipfs_cat(cid=_cid, api_base=IPFS_ENDPOINT)
+            print(consumer_deploy_info)
+
+            logger.info("🌐 Configuring DetNet-PREOF capabilities in the transport network via SDNc...")
+            SDN_CONTROLLER_ENDPOINT = "http://10.5.15.49:5000/..."
 
             mark("{}_deploy_finished".format(service_id_simplified))
             mark("{}_confirm_deploy_sent".format(service_id_simplified))
@@ -265,15 +312,67 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             logger.info("✅ Service deployed")
 
         else:
+            ipfs_file_content = utils.ipfs_cat(cid=_cid, api_base=IPFS_ENDPOINT)
+            ipfs_tmp_dir = tempfile.mkdtemp(prefix="federation-tmp-")
+            ipfs_tmp_file = os.path.join(ipfs_tmp_dir, os.path.basename("deploy.yml"))
+            with open(ipfs_tmp_file, "w", encoding="utf-8") as f:
+                f.write(ipfs_file_content)
+            consumer_deploy_info = utils.load_yaml_file(ipfs_tmp_file)
+
+            # Extract VXLAN + VTEP info
+            vxlan = utils.get_vxlan_network_config(consumer_deploy_info, overlay_name="federation-net")
+            vtep_names: List[str] = vxlan.get("endpoints", []) or []
+            vteps = [
+                utils.get_vtep_node_config(
+                    consumer_deploy_info,
+                    node_name=n,
+                    overlay_name=vxlan["name"],
+                    include_overlay=False,
+                )
+                for n in vtep_names
+            ]
+
+            # Build table
+            table = PrettyTable(hrules=ALL)
+            vni    = vxlan.get("vni", "-")
+            udp    = vxlan.get("udpPort", "-")
+            subnet = vxlan.get("overlaySubnet", "-")
+            table.title = f"VXLAN network (VNI: {vni}, UDP: {udp}, Subnet: {subnet})"
+            table.field_names = ["Node", "VTEP IP", "Address pool"]
+
+            for v in sorted(vteps, key=lambda x: x.get("name", "")):
+                table.add_row([v.get("name", "-"), v.get("vtepIP", "-"), v.get("addressPool", "-")])
+
+            table.align["Node"] = "l"
+            table.align["VTEP IP"] = "l"
+            table.align["Address pool"] = "l"
+
+            logger.info("Consumer info:")
+            print(table.get_string())
+
+            k8s_yaml = utils.get_k8s_manifest(
+                consumer_deploy_info,
+                include_kinds=["Pod", "Deployment", "Service", "NetworkAttachmentDefinition"],
+                as_yaml=True,
+            )
+            print("ROS Kubernetes manifest:\n", k8s_yaml)
+    
             logger.info("🌐 Creating VXLAN connecton with the consumer...")
+            print(vteps)
+            # utils.pretty(utils.vxlan_create(vni, "eno1", udp, "172.20.50.3/24", vteps))
 
             logger.info("🚀 Deploying ROS application container on Kubernetes...")
+            K8S_ORCHESTRATOR_ENDPOINT = "http://10.5.99.12:5000/..."
 
             mark("{}_deploy_finished".format(service_id_simplified))
 
             # Send deployment info
             mark("{}_deploy_info_sent_to_consumer".format(service_id_simplified))
-            deployment_manifest_cid = "QmExampleCIDForK8sDeploymentManifest"
+
+            # logging.info("Adding deploy info to IPFS")
+            res = utils.ipfs_add(file_path="/ipfs-deploy-info/domain3-deploy-info-service2.yml", api_base=IPFS_ENDPOINT)
+            deployment_manifest_cid = res["Hash"]
+            # deployment_manifest_cid = "QmExampleCIDForK8sDeploymentManifest"
             blockchain.update_endpoint(service_id, provider_flag, deployment_manifest_cid)
             logger.info("VXLAN endpoint shared.")
 
