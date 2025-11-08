@@ -308,11 +308,18 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
 
         if service_to_deploy == DESC_DETNET:
             # logger.info(f"Deployment manifest IPFS CID: {_cid}")
-            consumer_deploy_info = utils.ipfs_cat(cid=_cid, api_base=IPFS_ENDPOINT)
+            consumer_deploy_text = utils.ipfs_cat(cid=_cid, api_base=IPFS_ENDPOINT)
+            consumer_deploy_info = utils.load_json_text(consumer_deploy_text)
+            print(consumer_deploy_info)
+
+            src_ips = consumer_deploy_info.get("src_ips", [])
+            if isinstance(src_ips, str):
+                src_ips = [src_ips]
+            tos = consumer_deploy_info.get("tos_field")
 
             logger.info("ℹ️ Consumer input:")
-            logger.info("  • Source IPs: %s", ", ".join(consumer_deploy_info.get("src_ips", [])))
-            logger.info("  • Type of Service (ToS): %s", consumer_deploy_info.get("tos_field"))
+            logger.info("  • Source IPs: %s", ", ".join(src_ips))
+            logger.info("  • Type of Service (ToS): %s", tos)
 
             logger.info("🌐 Configuring DetNet-PREOF transport network via SDN controller...")
             SDN_CONTROLLER_ENDPOINT = "http://10.5.15.49:5000/..."

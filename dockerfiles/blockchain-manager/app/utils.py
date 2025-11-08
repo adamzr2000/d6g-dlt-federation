@@ -83,6 +83,12 @@ def ipfs_cat(cid: str, api_base: str, timeout: int = 30, decode: bool = True) ->
             return r.content.decode("latin-1", errors="replace")
     return r.content
 
+def load_json_text(s: str) -> Dict[str, Any]:
+    data = json.loads(s)
+    if not isinstance(data, dict):
+        raise ValueError("Top-level JSON must be an object")
+    return data
+
 def load_yaml_file(path: str) -> List[Dict[str, Any]]:
     if not os.path.isfile(path):
         raise FileNotFoundError(f"YAML file not found: {path}")
