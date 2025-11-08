@@ -62,7 +62,7 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
                 best_bid_index = bid_index
                 chosen_price = bid_price
 
-        print(table, end="")
+        print(table)
         return best_bid_index, chosen_price
 
     def wait_for_state(service_id: str, target_state: int = 2):
@@ -220,12 +220,23 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
         table.align["Value"] = "l"
         table.add_row(["Service ID", service_id])
         table.add_row(["Description", description])
-        table.add_row(["Availability", requirements[0]])
-        table.add_row(["Max Latency (ms)", requirements[1]])
-        table.add_row(["Max Jitter (ms)", requirements[2]])
-        table.add_row(["Min Bandwidth (Mbps)", requirements[3]])
-        table.add_row(["CPU (millicores)", requirements[4]])
-        table.add_row(["RAM (MB)", requirements[5]])
+        fields = [
+            ("Availability",            0),
+            ("Max Latency (ms)",        1),
+            ("Max Jitter (ms)",         2),
+            ("Min Bandwidth (Mbps)",    3),
+            ("CPU (millicores)",        4),
+            ("RAM (MB)",                5),
+        ]
+
+        for label, idx in fields:
+            try:
+                val = requirements[idx]
+            except (IndexError, TypeError):
+                continue
+            # Only print if it's an int > 0
+            if isinstance(val, int) and val > 0:
+                table.add_row([label, val])
         print(table)
 
     # ---------- start ----------
