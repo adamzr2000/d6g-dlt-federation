@@ -265,7 +265,8 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             elif simplified not in seen_other:
                 mark("{}_other_announce_received".format(simplified))
                 requirements = blockchain.get_service_requirements(service_id)
-                print_announcement_table(service_id, description, requirements)
+                # print_announcement_table(service_id, description, requirements)
+                logger.info(f"📨 New announcement received (Service ID: '{service_id}', Description: {description})")
                 logger.info("⚠️ Not able to provide this service. Ignoring announcement...")
                 seen_other.add(simplified)
 
