@@ -1,6 +1,6 @@
 # utils.py
 
-import re
+import requests
 import logging
 import csv
 import requests
@@ -56,32 +56,77 @@ def create_csv_file(file_path, header, data):
         writer.writerows(data)
     logger.info(f"Data saved to {file_path}")
 
+def _log_http_error(url: str, resp: Optional[requests.Response] = None, exc: Optional[Exception] = None):
+    """Log server response body only on error."""
+    if resp is not None:
+        body = None
+        try:
+            body = resp.text
+        except Exception:
+            body = "<no body>"
+        logger.error("HTTP error %s for %s\n%s", resp.status_code, url, body)
+    elif exc is not None:
+        logger.error("HTTP error calling %s: %s", url, exc)
+
+def _request_json(method: str, url: str, *, timeout: int = 10, **kwargs):
+    """Request expecting JSON; log error body on failure; raise on bad status."""
+    try:
+        r = requests.request(method, url, timeout=timeout, **kwargs)
+        if not r.ok:
+            _log_http_error(url, resp=r)
+            r.raise_for_status()
+        return r.json()
+    except requests.HTTPError:
+        raise
+    except Exception as e:
+        _log_http_error(url, exc=e)
+        raise
+
+def _request_bytes(method: str, url: str, *, timeout: int = 30, **kwargs) -> bytes:
+    """Request expecting bytes; log error body on failure; raise on bad status."""
+    try:
+        r = requests.request(method, url, timeout=timeout, **kwargs)
+        if not r.ok:
+            _log_http_error(url, resp=r)
+            r.raise_for_status()
+        return r.content
+    except requests.HTTPError:
+        raise
+    except Exception as e:
+        _log_http_error(url, exc=e)
+        raise
+
 def ipfs_add(file_path: str, api_base: str, pin: bool = True, timeout: int = 30):
     url = f"{api_base}/add"
     params = {"pin": "true" if pin else "false"}
-
-    basename = os.path.basename(file_path)                   # <-- key change
+    basename = os.path.basename(file_path)
     with open(file_path, "rb") as f:
-        files = {"file": (basename, f)}                      # <-- no directories in multipart filename
-        r = requests.post(url, params=params, files=files, timeout=timeout)
-    r.raise_for_status()
+        files = {"file": (basename, f)}
+        # returns NDJSON; we’ll parse manually but still get error-logging
+        try:
+            r = requests.post(url, params=params, files=files, timeout=timeout)
+            if not r.ok:
+                _log_http_error(url, resp=r)
+                r.raise_for_status()
+        except requests.HTTPError:
+            raise
+        except Exception as e:
+            _log_http_error(url, exc=e)
+            raise
 
-    # If IPFS still returns multiple NDJSON lines, pick the file object by Name
     objs = [json.loads(line) for line in r.text.strip().splitlines() if line.strip()]
-    # Prefer the object whose Name == basename; fallback to last
     obj = next((o for o in objs if o.get("Name") == basename), objs[-1])
-    return obj  # contains "Hash" (CID), "Name", "Size"
+    return obj  # { "Hash": ..., "Name": ..., "Size": ... }
 
 def ipfs_cat(cid: str, api_base: str, timeout: int = 30, decode: bool = True) -> str:
     url = f"{api_base}/cat"
-    r = requests.post(url, params={"arg": cid}, timeout=timeout)
-    r.raise_for_status()
+    content = _request_bytes("POST", url, timeout=timeout, params={"arg": cid})
     if decode:
         try:
-            return r.content.decode("utf-8")
+            return content.decode("utf-8")
         except UnicodeDecodeError:
-            return r.content.decode("latin-1", errors="replace")
-    return r.content
+            return content.decode("latin-1", errors="replace")
+    return content
 
 def load_json_text(s: str) -> Dict[str, Any]:
     data = json.loads(s)
@@ -245,33 +290,53 @@ def get_k8s_manifest(
 
 def vxlan_create(vni: int, iface: str, port: int, vxlan_ip: str,
                  remote_ips: List[str], base_url: str):
-    r = requests.post(f"{base_url}/vxlan",
-                      json={"vni": vni, "iface": iface, "port": port,
-                            "vxlan_ip": vxlan_ip, "remote_ips": remote_ips},
-                      timeout=10)
-    r.raise_for_status()
-    return r.json()
+    url = f"{base_url}/vxlan"
+    return _request_json("POST", url, timeout=20, json={
+        "vni": vni, "iface": iface, "port": port,
+        "vxlan_ip": vxlan_ip, "remote_ips": remote_ips
+    })
 
 def vxlan_add_peers(vxlan_iface: str, peers: List[str], base_url: str):
-    r = requests.post(f"{base_url}/vxlan/{vxlan_iface}/peers",
-                      json={"peers": peers}, timeout=10)
-    r.raise_for_status()
-    return r.json()
+    url = f"{base_url}/vxlan/{vxlan_iface}/peers"
+    return _request_json("POST", url, timeout=20, json={"peers": peers})
+
+def vxlan_delete_peers(vxlan_iface: str, peers: List[str], base_url: str) -> Dict[str, Any]:
+    url = f"{base_url}/vxlan/{vxlan_iface}/peers"
+    return _request_json("DELETE", url, timeout=20, json={"peers": peers})
 
 def vxlan_delete(vxlan_iface: str, base_url: str):
-    r = requests.delete(f"{base_url}/vxlan/{vxlan_iface}", timeout=10)
-    r.raise_for_status()
-    return r.json()
+    url = f"{base_url}/vxlan/{vxlan_iface}"
+    return _request_json("DELETE", url, timeout=20)
 
 def vxlan_ping(dst: str, base_url: str, count: int = 4, interval: float = 1.0, timeout: int = 10) -> Dict[str, Any]:
+    url = f"{base_url}/ping"
+    return _request_json("GET", url, timeout=timeout, params={"dst": dst, "count": count, "interval": interval})
+
+
+def k8s_apply_text(yaml_text: str, base_url: str, *, wait: bool = False,
+                   namespace: str = "default", timeout: int = 120):
+    url = f"{base_url}/apply"
+    params = {
+        "wait": "true" if wait else "false",
+        "namespace": namespace,
+        "timeout": str(timeout),
+    }
+    files = {"file": ("manifest.yaml", yaml_text.encode("utf-8"), "application/yaml")}
+    return _request_json("POST", url, params=params, files=files, timeout=timeout)
+
+def k8s_delete_all(base_url: str, *, wait: bool = False,
+                   namespace: str = "default", timeout: int = 120) -> Dict[str, Any]:
     """
-    Call the REST /ping endpoint and return parsed JSON.
-    Returns keys: dest, count, interval, sent, received, loss_pct, times_ms, exit_code
+    POST /deployments/delete_all with query params.
+    Mirrors: curl -X POST "{base_url}/deployments/delete_all?wait=true&timeout=60"
     """
-    params = {"dst": dst, "count": count, "interval": interval}
-    r = requests.get(f"{base_url}/ping", params=params, timeout=timeout)
-    r.raise_for_status()
-    return r.json()
+    url = f"{base_url}/deployments/delete_all"
+    params = {
+        "wait": "true" if wait else "false",
+        "namespace": namespace,
+        "timeout": str(timeout),
+    }
+    return _request_json("POST", url, params=params, timeout=timeout)
 
 def pretty(obj):  # tiny helper
     print(json.dumps(obj, indent=2))

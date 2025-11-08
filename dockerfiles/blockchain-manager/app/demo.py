@@ -165,16 +165,12 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
     # Connectivity setup & test
     mark("establish_connection_with_provider_start")
     logger.info("🌐 Creating VXLAN interconnection with provider...")
-
     provider_vtep = next(x['vtepIP'] for x in vteps if x['name'] == 'domain3-edge')
-    print(provider_vtep)
-
-    # utils.vxlan_add_peers("vxlan200", [provider_vtep], "http://10.5.1.21:6666") # Edge
-    # utils.vxlan_add_peers("vxlan200", [provider_vtep], "http://10.3.202.66:6666") # Robot
+    # resp1 = utils.vxlan_add_peers("vxlan200", [provider_vtep], "http://10.5.1.21:6666") # Edge
+    # resp2 = utils.vxlan_add_peers("vxlan200", [provider_vtep], "http://10.3.202.66:6666") # Robot
     mark("establish_connection_with_provider_finished")
 
     logger.info("🌐 Testing connection from robot to federated instance in provider domain...")
-
     ping_res = utils.vxlan_ping("127.0.0.1", base_url="http://10.5.1.21:6666", count=5, interval=0.2)
     times = [round(t, 1) for t in (ping_res.get("times_ms") or [])][:5]
     logger.info("📶 Ping loss=%s%% exit=%s times_ms[0:5]=%s",
@@ -394,15 +390,15 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             )
 
             logger.info("🌐 Creating VXLAN interconnecton with consumer...")
-            
             robot_vtep = next(x['vtepIP'] for x in vteps if x['name'] == 'domain1-robot')
             edge_vtep  = next(x['vtepIP'] for x in vteps if x['name'] == 'domain1-edge')
-            print(robot_vtep, edge_vtep)
-
-            # utils.pretty(utils.vxlan_create(vni, "eno1", udp, "172.20.50.3/24", [robot_vtep, edge_vtep]))
+            resp = utils.vxlan_create(vni, "eno1", udp, "172.20.50.3/24", [robot_vtep, edge_vtep])
+            utils.pretty(resp)
 
             logger.info("🚀 Deploying ROS application container on Kubernetes...")
-            K8S_ORCHESTRATOR_ENDPOINT = "http://10.5.99.12:5000/..."
+            K8S_ORCHESTRATOR_ENDPOINT = "http://10.5.99.12:6665"
+            resp = utils.k8s_apply_text(k8s_manifest, K8S_ORCHESTRATOR_ENDPOINT, wait=True)
+            utils.pretty(resp)
 
             mark("{}_deploy_finished".format(service_id_simplified))
 
@@ -412,7 +408,6 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             # logging.info("Adding deploy info to IPFS")
             res = utils.ipfs_add(file_path="/ipfs-deploy-info/domain3-deploy-info-service2.yml", api_base=IPFS_ENDPOINT)
             deployment_manifest_cid = res["Hash"]
-            # deployment_manifest_cid = "QmExampleCIDForK8sDeploymentManifest"
             blockchain.update_endpoint(service_id, provider_flag, deployment_manifest_cid)
             logger.info("✅ VXLAN and federated instance info shared.")
 

@@ -22,6 +22,13 @@ URL_CONSUMER_DOMAIN1 = "http://10.5.15.55:8090/start_demo_consumer"
 URL_PROVIDER_DOMAIN2 = "http://10.5.99.6:8090/start_demo_provider"
 URL_PROVIDER_DOMAIN3 = "http://10.5.99.5:8090/start_demo_provider"
 
+# --- NEW: cleanup endpoints ---
+K8S_ORCH_D3    = "http://10.5.99.12:6665"      # domain3 edge: k8s orchestrator
+VXLAN_D3       = "http://10.5.99.12:6666"      # domain3 edge: vxlan service
+VXLAN_D1_EDGE  = "http://10.5.1.21:6666"       # domain1 edge: vxlan service
+VXLAN_D1_ROBOT = "http://10.3.202.66:6666"     # domain1 robot: vxlan service
+D3_EDGE_VTEP   = "10.11.7.6"                    # domain3 edge VTEP IP to remove as peer
+
 HEADERS = {"Content-Type": "application/json"}
 
 print_lock = threading.Lock()  # keep logs tidy across threads
@@ -150,6 +157,57 @@ def run_once(run_idx: int, export_to_csv: bool) -> None:
         else:
             print("- {}: ERROR → {}".format(name, r.get("error")))
 
+def _ok(msg: str) -> None:
+    with print_lock:
+        print("[cleanup] ✓ " + msg)
+
+def _err(msg: str, e: Exception) -> None:
+    with print_lock:
+        print("[cleanup] ✗ {}: {}".format(msg, e))
+
+def _post_no_body(url: str, timeout: int = 30) -> Dict[str, Any]:
+    r = requests.post(url, timeout=timeout)
+    r.raise_for_status()
+    if r.headers.get("content-type", "").startswith("application/json"):
+        return r.json()
+    return {"raw": r.text}
+
+def _delete_json(url: str, payload: Dict[str, Any] = None, timeout: int = 30) -> Dict[str, Any]:
+    r = requests.delete(url, json=(payload or {}), timeout=timeout)
+    r.raise_for_status()
+    if r.headers.get("content-type", "").startswith("application/json"):
+        return r.json()
+    return {"raw": r.text}
+
+def cleanup_after_run() -> None:
+    """Best-effort cleanup after each run (matches your cURL sequence)."""
+    # 1) Domain3 edge: delete all k8s deployments (wait) and remove vxlan200
+    try:
+        _post_no_body("{}/deployments/delete_all?wait=true".format(K8S_ORCH_D3))
+        _ok("domain3: k8s deployments deleted")
+    except Exception as e:
+        _err("domain3: k8s delete_all failed", e)
+
+    try:
+        _delete_json("{}/vxlan/vxlan200".format(VXLAN_D3))
+        _ok("domain3: vxlan200 removed")
+    except Exception as e:
+        _err("domain3: vxlan200 delete failed", e)
+
+    # 2) Remove domain3 edge as peer from domain1 edge + robot
+    # peers_payload = {"peers": [D3_EDGE_VTEP]}
+    # try:
+    #     _delete_json("{}/vxlan/vxlan200/peers".format(VXLAN_D1_EDGE), payload=peers_payload)
+    #     _ok("domain1 edge: removed peer {}".format(D3_EDGE_VTEP))
+    # except Exception as e:
+    #     _err("domain1 edge: remove peer failed", e)
+
+    # try:
+    #     _delete_json("{}/vxlan/vxlan200/peers".format(VXLAN_D1_ROBOT), payload=peers_payload)
+    #     _ok("domain1 robot: removed peer {}".format(D3_EDGE_VTEP))
+    # except Exception as e:
+    #     _err("domain1 robot: remove peer failed", e)
+
 def main():
     parser = argparse.ArgumentParser(description="Run multiple experimental runs for federation demo (concurrent per run).")
     parser.add_argument("--runs", type=int, default=1, help="Number of experiment runs (default: 1)")
@@ -163,12 +221,14 @@ def main():
     for i in range(1, args.runs + 1):
         try:
             run_once(i, export_to_csv)
-            if i < args.runs:
-                time.sleep(args.sleep)
         except Exception as e:
             print("!! Run {} failed: {}".format(i, e))
-            # continue to next run
-            continue
+        finally:
+            time.sleep(10)
+            cleanup_after_run()
+
+        if i < args.runs:
+            time.sleep(args.sleep)
 
     print("\nAll requested runs finished.")
 
