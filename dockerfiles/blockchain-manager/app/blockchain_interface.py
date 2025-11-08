@@ -45,10 +45,12 @@ class BlockchainInterface:
 
         self.contract = self.web3.eth.contract(address=Web3.toChecksumAddress(contract_address), abi=abi)
 
-        logger.info(f"Web3 initialized:")
-        logger.info(f"  - Address: {self.eth_address}")        
-        logger.info(f"  - Ethereum node URL: {eth_node_url}")
-        logger.info(f"  - Version: {self.web3.clientVersion}")
+        logger.info(
+            "Web3 initialized\n"
+            f"  • Address: {self.eth_address}\n"
+            f"  • Ethereum node URL: {eth_node_url}\n"
+            f"  • Version: {self.web3.clientVersion}"
+        )
 
         # Initialize local nonce and lock
         self._nonce_lock = threading.Lock()

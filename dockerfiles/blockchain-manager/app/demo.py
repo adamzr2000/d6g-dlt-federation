@@ -104,9 +104,9 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
         mark(f"{key}_deploy_info_sent_to_provider")
         tx_hash = blockchain.update_endpoint(service_id, provider_flag, service["deployment_manifest_cid"])
         if key == "service1":
-            logger.info("Endpoint information for L2 connection shared")
+            logger.info("🌐 Endpoint information for L2 connection shared")
         else:
-            logger.info("Endpoint information for VXLAN connection and Kubernetes manifest shared")
+            logger.info("🌐 Endpoint information for VXLAN connection and Kubernetes manifest shared")
 
         # Wait for deployment confirmation
         wait_for_state(service_id, target_state=2)
@@ -334,7 +334,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
                 src_ips = [src_ips]
             tos = consumer_deploy_info.get("tos_field")
 
-            logger.info(f"ℹ️ Consumer input (Src IPs: {src_ips}, ToS: {tos}")
+            logger.info(f"ℹ️ Consumer input (Src IPs: {src_ips}, ToS: {tos})")
 
             logger.info("🌐 Configuring DetNet-PREOF transport network via SDN controller...")
             SDN_CONTROLLER_ENDPOINT = "http://10.5.15.49:5000/..."
@@ -388,7 +388,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
 
             logger.info(
                 "ℹ️ Consumer input\n"
-                "  • 🌐VXLAN:\n%s\n"
+                "  • 🌐 VXLAN:\n%s\n"
                 "  • ☸️ Kubernetes manifest (truncated): \n%s",
                 table.get_string(), utils.truncate_text(k8s_manifest, max_lines=4, max_chars=8000),
             )

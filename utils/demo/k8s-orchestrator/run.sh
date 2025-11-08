@@ -7,5 +7,6 @@ docker run \
     --rm \
     --name $container_image \
     --privileged \
+    -p 6665:8000 \
     -v "$(pwd)/app":/app \
     $container_image:latest

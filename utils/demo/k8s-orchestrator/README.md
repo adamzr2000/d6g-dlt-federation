@@ -1,4 +1,4 @@
-# VXLAN Configurator
+# Kubernetes orchestrator
 
 1. Build the Docker image
 ```shell
@@ -14,61 +14,28 @@
 
 ### Health check
 ```shell
-curl http://localhost:6666/health | jq
+curl -s http://localhost:6665/health | jq
 ```
 ---
-### Create iface + peers:
-- Edge
+### Apply manifest:
 ```shell
-curl -X POST http://localhost:6666/vxlan \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "vni": 200,
-    "iface": "enp9s0f1",
-    "port": 4747,
-    "vxlan_ip": "172.20.50.1/24",
-    "remote_ips": ["10.3.202.66"]
-  }' | jq
-```
-- Robot
-```shell
-curl -X POST http://localhost:6666/vxlan \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "vni": 200,
-    "iface": "ue0",
-    "port": 4747,
-    "vxlan_ip": "172.20.50.2/24",
-    "remote_ips": ["10.11.7.4"]
-  }' | jq
-```
-- Remote cluster
-```shell
-curl -X POST http://localhost:6666/vxlan \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "vni": 200,
-    "iface": "usb-eth0",
-    "port": 4747,
-    "vxlan_ip": "172.20.50.3/24",
-    "remote_ips": ["10.5.1.21"]
-  }' | jq
+curl -s -X POST "http://localhost:6665/apply?wait=true" \
+  -F "file=@alpine-service.yaml" | jq
 ```
 ---
-### Add peers later:
+### List deployments:
 ```shell
-curl -X POST http://localhost:6666/vxlan/vxlan200/peers \
-  -H 'Content-Type: application/json' \
-  -d '{"peers": ["10.5.99.30"]}' | jq
+curl -s http://localhost:6665/deployments | jq
 ```
 ---
-### Show FDB:
+### Delete manifest:
 ```shell
-curl http://localhost:6666/vxlan/vxlan200/fdb | jq
+curl -s -X POST "http://localhost:6665/delete" \
+  -F "file=@alpine-service.yaml" | jq
 ```
 ---
-### Delete interface:
+### Delete all:
 ```shell
-curl -X DELETE http://localhost:6666/vxlan/vxlan200 | jq
+curl -s -X POST http://localhost:6665/deployments/delete_all | jq
 ```
 
