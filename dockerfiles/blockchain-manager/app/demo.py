@@ -20,6 +20,7 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
     header = STEP_HEADER
     blockchain = app.state.blockchain
     provider_flag = app.state.provider_flag
+    # print(services_to_announce)
 
     # monotonic base
     rel0 = time.perf_counter()
@@ -61,7 +62,7 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
                 best_bid_index = bid_index
                 chosen_price = bid_price
 
-        print(table)
+        print(table, end="")
         return best_bid_index, chosen_price
 
     def wait_for_state(service_id: str, target_state: int = 2):
@@ -173,15 +174,13 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
     mark("establish_connection_with_provider_finished")
 
     logger.info("🌐 Testing connection from robot to federated instance in provider domain...")
-    ping_res = utils.vxlan_ping("127.0.0.1", base_url="http://10.5.1.21:6666", count=5, interval=0.2)
 
-    logger.info(
-        "📶 E2E service running\n"
-        "loss %: %s\n",
-        "exit: %s\n",
-        "first 5 RTTs (ms): %s\n",
-        ping_res["loss_pct"], ping_res["exit_code"], ping_res["times_ms"][:5]
-    )
+    ping_res = utils.vxlan_ping("127.0.0.1", base_url="http://10.5.1.21:6666", count=5, interval=0.2)
+    times = [round(t, 1) for t in (ping_res.get("times_ms") or [])][:5]
+    logger.info("📶 Ping loss=%s%% exit=%s times_ms[0:5]=%s",
+    ping_res.get("loss_pct"), ping_res.get("exit_code"), times)
+
+    logger.info("✅ E2E service running")
 
     t_rel_end = mark("end")  # final timestamp
     logger.info("✅ Federation(s) #1 and #2 successfully completed in {:.2f} seconds.".format(t_rel_end))
@@ -283,7 +282,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
     # Place bid
     mark("{}_bid_offer_sent".format(service_id_simplified))
     blockchain.place_bid(service_id, price_wei_per_hour, location)
-    logger.info(f"💰 Bid offer sent (Service ID: '{service_id}', Price: {price_wei_per_hour} Wei/hour)")
+    logger.info(f"💰 Bid offer sent for '{service_id}' with price={price_wei_per_hour} wei/hour)")
 
     # Wait for winner
     logger.info("⏳ Waiting for a winner to be selected...")
@@ -316,19 +315,14 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             # logger.info(f"Deployment manifest IPFS CID: {_cid}")
             consumer_deploy_text = utils.ipfs_cat(cid=_cid, api_base=IPFS_ENDPOINT)
             consumer_deploy_info = utils.load_json_text(consumer_deploy_text)
-            print(consumer_deploy_info)
+            # print(consumer_deploy_info)
 
             src_ips = consumer_deploy_info.get("src_ips", [])
             if isinstance(src_ips, str):
                 src_ips = [src_ips]
             tos = consumer_deploy_info.get("tos_field")
 
-            logger.info(
-                "ℹ️ Consumer input\n"
-                "  • Source IPs: %s\n"
-                "  • Type of Service: %s",
-                src_ips, tos,
-            )
+            logger.info(f"ℹ️ Consumer input (Src IPs: {src_ips}, ToS: {tos}")
 
             logger.info("🌐 Configuring DetNet-PREOF transport network via SDN controller...")
             SDN_CONTROLLER_ENDPOINT = "http://10.5.15.49:5000/..."
@@ -382,8 +376,8 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
 
             logger.info(
                 "ℹ️ Consumer input\n"
-                "  • VXLAN:\n%s\n"
-                "  • ☸️ Kubernetes manifest (truncated): %s",
+                "  • 🌐VXLAN:\n%s\n"
+                "  • ☸️ Kubernetes manifest (truncated): \n%s",
                 table.get_string(), utils.truncate_text(k8s_manifest, max_lines=4, max_chars=8000),
             )
 
@@ -408,7 +402,7 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             deployment_manifest_cid = res["Hash"]
             # deployment_manifest_cid = "QmExampleCIDForK8sDeploymentManifest"
             blockchain.update_endpoint(service_id, provider_flag, deployment_manifest_cid)
-            logger.info("VXLAN and federated instance info shared.")
+            logger.info("✅ VXLAN and federated instance info shared.")
 
             mark("{}_confirm_deploy_sent".format(service_id_simplified))
             blockchain.service_deployed(service_id)

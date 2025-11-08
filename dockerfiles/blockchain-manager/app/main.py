@@ -444,12 +444,12 @@ def start_demo_consumer(request: DemoConsumerRequest):
         ]
 
         service2_requirements = [
-            request.service1_availability,
-            request.service1_max_latency_ms,
-            request.service1_max_jitter_ms,
-            request.service1_min_bandwidth_Mbps,
-            request.service1_compute_cpu_mcores,
-            request.service1_compute_ram_MB,
+            request.service2_availability,
+            request.service2_max_latency_ms,
+            request.service2_max_jitter_ms,
+            request.service2_min_bandwidth_Mbps,
+            request.service2_compute_cpu_mcores,
+            request.service2_compute_ram_MB,
         ]
 
         services_to_announce = {

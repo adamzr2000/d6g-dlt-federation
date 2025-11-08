@@ -116,12 +116,10 @@ def run_once(run_idx: int, export_to_csv: bool) -> None:
         "service1_max_jitter_ms": 10,
         "service1_min_bandwidth_Mbps": 20,
         "service1_deployment_manifest_cid": service1_cid,
-
         "service2_description": "ros_app_k8s_deployment",
         "service2_compute_cpu_mcores": 2000,
         "service2_compute_ram_MB": 4000,
         "service2_deployment_manifest_cid": service2_cid,
-
         "expected_hours": 2,
         "export_to_csv": export_to_csv,
         "csv_path": consumer_csv,
