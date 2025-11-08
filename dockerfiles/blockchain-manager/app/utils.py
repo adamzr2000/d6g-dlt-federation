@@ -7,7 +7,6 @@ import ipaddress
 import requests
 import yaml
 from pathlib import Path
-from __future__ import annotations
 from typing import Any, Dict, List, Optional, Union
 import os
 import json
