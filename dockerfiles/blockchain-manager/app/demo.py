@@ -88,8 +88,14 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
             service["requirements"][4],
             service["requirements"][5],
         )
-        logger.info(f"📢 Service announcement sent (Service ID: '{service_id}', Description: {service['description']})")
 
+        logger.info(
+            "📢 Service announcement sent\n"
+            "  • Service ID: %s\n"
+            "  • Description: %s",
+            service_id, service['description'],
+        )
+    
         # Bids
         bids_count = wait_for_bids(service_id, offers_to_wait)
         mark(f"{key}_bid_offer_received")
@@ -273,7 +279,12 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
                 mark("{}_other_announce_received".format(simplified))
                 requirements = blockchain.get_service_requirements(service_id)
                 # print_announcement_table(service_id, description, requirements)
-                logger.info(f"📨 New announcement received (Service ID: '{service_id}', Description: {description})")
+                logger.info(
+                    "📨 New announcement received\n"
+                    "  • Service ID: %s\n"
+                    "  • Description: %s",
+                    service_id, description,
+                )
                 logger.info("⚠️ Not able to provide this service. Ignoring announcement...")
                 seen_other.add(simplified)
 
@@ -394,12 +405,12 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             edge_vtep  = next(x['vtepIP'] for x in vteps if x['name'] == 'domain1-edge')
             VXLAN_CONFIGURATOR_ENDPOINT = "http://10.5.99.12:6666"
             resp = utils.vxlan_create(vni, "eno1", udp, "172.20.50.3/24", [robot_vtep, edge_vtep], VXLAN_CONFIGURATOR_ENDPOINT)
-            utils.pretty(resp)
+            # utils.pretty(resp)
 
             logger.info("🚀 Deploying ROS application container on Kubernetes...")
             K8S_ORCHESTRATOR_ENDPOINT = "http://10.5.99.12:6665"
             resp = utils.k8s_apply_text(k8s_manifest, K8S_ORCHESTRATOR_ENDPOINT, wait=True)
-            utils.pretty(resp)
+            # utils.pretty(resp)
 
             mark("{}_deploy_finished".format(service_id_simplified))
 

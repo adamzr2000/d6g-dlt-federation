@@ -47,7 +47,7 @@ class BlockchainInterface:
 
         logger.info(
             "Web3 initialized\n"
-            f"  • Address: {self.eth_address}\n"
+            f"  • Ethereum address: {self.eth_address}\n"
             f"  • Ethereum node URL: {eth_node_url}\n"
             f"  • Version: {self.web3.clientVersion}"
         )
