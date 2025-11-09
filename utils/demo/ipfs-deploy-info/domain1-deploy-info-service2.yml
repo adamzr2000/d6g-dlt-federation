@@ -76,4 +76,6 @@ spec:
           value: "http://172.20.50.10:11311"
         - name: ROS_IP
           value: "172.20.50.50"
+        - name: ROS_ROLE
+          value: "subscriber"
 ---

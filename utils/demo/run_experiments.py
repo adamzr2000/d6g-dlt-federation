@@ -102,7 +102,7 @@ def run_once(run_idx: int, export_to_csv: bool) -> None:
 
     payload_provider2 = {
         "description_filter": "detnet_transport",
-        "price_wei_per_hour": 10000,
+        "price_wei_per_hour": 7000,
         "location": "5TONIC @ Madrid, Spain",
         "export_to_csv": export_to_csv,
         "csv_path": provider2_csv,
