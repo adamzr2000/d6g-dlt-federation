@@ -1,0 +1,12 @@
+step,t_rel
+start,5.214940756559372e-06
+service1_other_announce_received,3.919946077745408
+service2_announce_received,21.937808443792164
+service2_bid_offer_sent,21.937810536008328
+service2_winner_received,27.93604570766911
+service2_deploy_start,27.94435683498159
+service2_get_deploy_info_from_consumer,27.960200120694935
+service2_deploy_finished,29.056852628011256
+service2_deploy_info_sent_to_consumer,29.056854704860598
+service2_confirm_deploy_sent,29.104597692843527
+end,29.138449165970087
