@@ -172,7 +172,7 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
     mark("establish_connection_with_provider_start")
     logger.info("🌐 Creating VXLAN interconnection with provider...")
     provider_vtep = next(x['vtepIP'] for x in vteps if x['name'] == 'domain3-edge')
-    # resp1 = utils.vxlan_add_peers("vxlan200", [provider_vtep], "http://10.5.1.21:6666") # Edge
+    resp1 = utils.vxlan_add_peers("vxlan200", [provider_vtep], "http://10.5.1.21:6666") # Edge
     # resp2 = utils.vxlan_add_peers("vxlan200", [provider_vtep], "http://10.3.202.66:6666") # Robot
     mark("establish_connection_with_provider_finished")
 
@@ -344,7 +344,8 @@ def run_provider_federation_demo(app, price_wei_per_hour, location, description_
             logger.info(f"ℹ️ Consumer input (Src IPs: {src_ips}, ToS: {tos})")
 
             logger.info("🌐 Configuring DetNet-PREOF transport network via SDN controller...")
-            SDN_CONTROLLER_ENDPOINT = "http://10.5.15.49:5000/..."
+            SDN_CONTROLLER_ENDPOINT = "http://10.5.15.49:8080/d6g-controller-API"
+            utils.sdn_config_detnet_path(SDN_CONTROLLER_ENDPOINT, "10.11.7.4", "10.11.7.6", tos)
 
             mark("{}_deploy_finished".format(service_id_simplified))
             mark("{}_confirm_deploy_sent".format(service_id_simplified))

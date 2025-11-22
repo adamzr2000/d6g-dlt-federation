@@ -340,3 +340,47 @@ def k8s_delete_all(base_url: str, *, wait: bool = False,
 
 def pretty(obj):  # tiny helper
     print(json.dumps(obj, indent=2))
+
+
+def sdn_clear_all_tables(base_url: str, timeout: int = 120) -> Dict[str, Any]:
+    """
+    Call the SDN controller to clear all Tofino tables.
+
+    Equivalent to:
+      curl -X DELETE http://<host>:8080/d6g-controller-API
+    """
+    url = base_url.rstrip("/")
+    # logger.info("SDN: clearing all Tofino tables via %s", url)
+    return _request_json("DELETE", url, timeout=timeout)
+
+
+def sdn_config_detnet_path(
+    base_url: str,
+    src_ip: str,
+    dst_ip: str,
+    tos_field: int,
+    timeout: int = 120,
+) -> Dict[str, Any]:
+    """
+    Configure DetNet/Tofino tables for a given (src_ip, dst_ip, tos_field).
+
+    Equivalent to:
+      curl -X POST $SDNc -H "Content-Type: application/json" -d '{
+        "action":"config",
+        "src_ip":"10.3.202.67",
+        "dst_ip":"10.11.7.6",
+        "tos_field":5
+      }'
+    """
+    url = base_url.rstrip("/")
+    payload = {
+        "action": "config",
+        "src_ip": src_ip,
+        "dst_ip": dst_ip,
+        "tos_field": tos_field,
+    }
+    # logger.info(
+    #     "SDN: applying DetNet config via %s (src_ip=%s, dst_ip=%s, tos=%s)",
+    #     url, src_ip, dst_ip, tos_field
+    # )
+    return _request_json("POST", url, timeout=timeout, json=payload)

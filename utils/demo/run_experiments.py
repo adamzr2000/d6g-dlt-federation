@@ -28,6 +28,7 @@ VXLAN_D3       = "http://10.5.99.12:6666"      # domain3 edge: vxlan service
 VXLAN_D1_EDGE  = "http://10.5.1.21:6666"       # domain1 edge: vxlan service
 VXLAN_D1_ROBOT = "http://10.3.202.66:6666"     # domain1 robot: vxlan service
 D3_EDGE_VTEP   = "10.11.7.6"                    # domain3 edge VTEP IP to remove as peer
+SDNc = "http://10.5.15.49:8080/d6g-controller-API"
 
 HEADERS = {"Content-Type": "application/json"}
 
@@ -179,6 +180,17 @@ def _delete_json(url: str, payload: Dict[str, Any] = None, timeout: int = 30) ->
         return r.json()
     return {"raw": r.text}
 
+
+def sdn_clear_all_tables(base_url: str, timeout: int = 120) -> Dict[str, Any]:
+    """
+    Call the SDN controller to clear all Tofino tables.
+
+    Equivalent to:
+      curl -X DELETE http://<host>:8080/d6g-controller-API
+    """
+    # We send an empty JSON object {}, which the controller happily ignores.
+    return _delete_json(base_url, payload=None, timeout=timeout)
+
 def cleanup_after_run() -> None:
     """Best-effort cleanup after each run (matches your cURL sequence)."""
     # 1) Domain3 edge: delete all k8s deployments (wait) and remove vxlan200
@@ -195,18 +207,25 @@ def cleanup_after_run() -> None:
         _err("domain3: vxlan200 delete failed", e)
 
     # 2) Remove domain3 edge as peer from domain1 edge + robot
-    # peers_payload = {"peers": [D3_EDGE_VTEP]}
-    # try:
-    #     _delete_json("{}/vxlan/vxlan200/peers".format(VXLAN_D1_EDGE), payload=peers_payload)
-    #     _ok("domain1 edge: removed peer {}".format(D3_EDGE_VTEP))
-    # except Exception as e:
-    #     _err("domain1 edge: remove peer failed", e)
+    peers_payload = {"peers": [D3_EDGE_VTEP]}
+    try:
+        _delete_json("{}/vxlan/vxlan200/peers".format(VXLAN_D1_EDGE), payload=peers_payload)
+        _ok("domain1 edge: removed peer {}".format(D3_EDGE_VTEP))
+    except Exception as e:
+        _err("domain1 edge: remove peer failed", e)
 
     # try:
     #     _delete_json("{}/vxlan/vxlan200/peers".format(VXLAN_D1_ROBOT), payload=peers_payload)
     #     _ok("domain1 robot: removed peer {}".format(D3_EDGE_VTEP))
     # except Exception as e:
     #     _err("domain1 robot: remove peer failed", e)
+
+    # 3) Clear DetNet / Tofino tables via SDN controller
+    try:
+        sdn_clear_all_tables(SDNc, timeout=180)
+        _ok("SDN controller: cleared all Tofino tables")
+    except Exception as e:
+        _err("SDN controller: clear-all failed", e)
 
 def main():
     parser = argparse.ArgumentParser(description="Run multiple experimental runs for federation demo (concurrent per run).")
