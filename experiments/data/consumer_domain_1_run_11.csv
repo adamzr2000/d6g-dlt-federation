@@ -1,0 +1,17 @@
+step,t_rel
+start,0.00011109607294201851
+service1_announced,0.00011823605746030807
+service1_bid_offer_received,7.22728479700163
+service1_winner_chosen,7.249735722085461
+service1_deploy_info_sent_to_provider,7.32566851307638
+service1_confirm_deploy_received,19.296156759141013
+service2_announced,19.296550155151635
+service2_bid_offer_received,27.192201938014477
+service2_winner_chosen,27.215294370194897
+service2_deploy_info_sent_to_provider,27.290430177003145
+service2_confirm_deploy_received,37.282496290048584
+service2_get_deploy_info_from_provider,37.32280156901106
+establish_connection_with_provider_start,37.34201547410339
+establish_connection_with_provider_finished,37.3598735970445
+e2e_service_running,37.77785459300503
+end,37.77804992906749
