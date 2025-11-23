@@ -9,14 +9,14 @@ os.makedirs(SUMMARY_DIR, exist_ok=True)
 
 # Main federation window per domain
 STEP_RANGES = {
-    "consumer_domain_1": ("service1_announced", "establish_connection_with_provider_finished"), # "e2e_service_running"
+    "consumer_domain_1": ("service1_announced", "e2e_service_running"), # "e2e_service_running"
     "provider_domain_2": ("service1_announce_received", "service1_confirm_deploy_sent"),
     "provider_domain_3": ("service2_announce_received", "service2_confirm_deploy_sent"),
 }
 
 # Off-chain window per domain (as requested)
 OFFCHAIN_STEP_RANGES = {
-    "consumer_domain_1": ("establish_connection_with_provider_start", "establish_connection_with_provider_finished"), # "e2e_service_running"
+    "consumer_domain_1": ("establish_connection_with_provider_start", "e2e_service_running"), # "e2e_service_running"
     "provider_domain_2": ("service1_deploy_start", "service1_deploy_finished"),
     "provider_domain_3": ("service2_deploy_start", "service2_deploy_finished"),
 }

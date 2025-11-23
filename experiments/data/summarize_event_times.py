@@ -23,7 +23,7 @@ EVENTS_BY_DOMAIN: Dict[str, List[str]] = {
         "service2_winner_chosen",
         "service2_deploy_info_sent_to_provider",
         "service2_confirm_deploy_received",
-        # "e2e_service_running",
+        "e2e_service_running",
     ],
     "provider_domain_2": [
         "service1_announce_received",

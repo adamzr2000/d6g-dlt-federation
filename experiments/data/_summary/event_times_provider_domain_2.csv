@@ -1,7 +1,7 @@
 domain,event,runs,mean_t_rel_s,std_t_rel_s
-provider_domain_2,service1_announce_received,20,3.663191,0.594101
-provider_domain_2,service1_bid_offer_sent,20,3.663194,0.594102
-provider_domain_2,service1_winner_received,20,9.64003,0.582494
-provider_domain_2,service1_deploy_start,20,9.648616,0.582554
-provider_domain_2,service1_deploy_finished,20,15.235505,0.587762
-provider_domain_2,service1_confirm_deploy_sent,20,15.235507,0.587762
+provider_domain_2,service1_announce_received,20,3.150519,0.30498
+provider_domain_2,service1_bid_offer_sent,20,3.150523,0.304981
+provider_domain_2,service1_winner_received,20,11.136611,0.297884
+provider_domain_2,service1_deploy_start,20,11.144961,0.297926
+provider_domain_2,service1_deploy_finished,20,16.733325,0.289863
+provider_domain_2,service1_confirm_deploy_sent,20,16.733328,0.289863
