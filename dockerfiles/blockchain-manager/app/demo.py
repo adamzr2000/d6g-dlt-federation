@@ -177,11 +177,11 @@ def run_consumer_federation_demo(app, services_to_announce, expected_hours, offe
     mark("establish_connection_with_provider_finished")
 
     logger.info("🌐 Testing connection from robot to federated instance in provider domain...")
-    ping_res = utils.vxlan_ping("127.0.0.1", base_url="http://10.5.1.21:6666", count=5, interval=0.2)
+    ping_res = utils.vxlan_ping("127.0.0.1", base_url="http://10.5.1.21:6666", count=3, interval=0.2)
     times = [round(t, 1) for t in (ping_res.get("times_ms") or [])][:5]
     logger.info("📶 Ping loss=%s%% exit=%s times_ms[0:5]=%s",
     ping_res.get("loss_pct"), ping_res.get("exit_code"), times)
-
+    mark("e2e_service_running")
     logger.info("✅ E2E service running")
 
     t_rel_end = mark("end")  # final timestamp
